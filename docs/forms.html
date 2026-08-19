@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forms — phporbit</title>
+<meta name="description" content="One declaration that renders a form, validates it, and carries its own spam protection.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html" class="current" aria-current="page">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Forms</h1>
+        <p class="summary">One declaration that renders a form, validates it, and carries its own spam protection.</p>
+        <figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Form\Field</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Form\Form</span><span class="tk-p">;</span>
+
+<span class="tk-var">$form</span> <span class="tk-p">=</span> <span class="tk-class">Form</span>::<span class="tk-fn">post</span><span class="tk-p">(</span><span class="tk-string">&#039;/contact&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">add</span><span class="tk-p">(</span>
+        <span class="tk-class">Field</span>::<span class="tk-fn">text</span><span class="tk-p">(</span><span class="tk-string">&#039;name&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">max</span><span class="tk-p">(</span><span class="tk-num">80</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-class">Field</span>::<span class="tk-fn">email</span><span class="tk-p">(</span><span class="tk-string">&#039;email&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">hint</span><span class="tk-p">(</span><span class="tk-string">&#039;Only used to reply to you.&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-class">Field</span>::<span class="tk-fn">select</span><span class="tk-p">(</span><span class="tk-string">&#039;topic&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;General&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;Bug report&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;Security&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-class">Field</span>::<span class="tk-fn">textarea</span><span class="tk-p">(</span><span class="tk-string">&#039;message&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">min</span><span class="tk-p">(</span><span class="tk-num">10</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">max</span><span class="tk-p">(</span><span class="tk-num">2000</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">submitLabel</span><span class="tk-p">(</span><span class="tk-string">&#039;Send message&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// Rendering</span>
+<span class="tk-keyword">echo</span> <span class="tk-var">$form</span>-&gt;<span class="tk-fn">render</span><span class="tk-p">(</span><span class="tk-var">$session</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Handling</span>
+<span class="tk-var">$submission</span> <span class="tk-p">=</span> <span class="tk-var">$form</span>-&gt;<span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-var">$request</span><span class="tk-p">,</span> <span class="tk-var">$session</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$submission</span>-&gt;<span class="tk-fn">failed</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;contact&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+        <span class="tk-string">&#039;form&#039;</span> =&gt; <span class="tk-var">$form</span>-&gt;<span class="tk-fn">render</span><span class="tk-p">(</span><span class="tk-var">$session</span><span class="tk-p">,</span> <span class="tk-var">$submission</span>-&gt;<span class="tk-fn">old</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span> <span class="tk-var">$submission</span>-&gt;<span class="tk-fn">errors</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-p">]</span><span class="tk-p">,</span> <span class="tk-class">Status</span>::<span class="tk-class">UnprocessableEntity</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span>
+
+<span class="tk-var">$name</span> <span class="tk-p">=</span> <span class="tk-var">$submission</span>-&gt;<span class="tk-fn">value</span><span class="tk-p">(</span><span class="tk-string">&#039;name&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<div class="good">
+<b>The markup and the validation cannot disagree</b>
+<p><code>Field::email('email')->required()</code> produces the <code>required</code> attribute <em>and</em> the check that rejects a blank value. A form whose rendering and validation are declared separately is the ordinary way a field ends up unvalidated — the two drift, and the one that matters is the one nobody updated.</p>
+</div>
+
+<h2>What you get without asking</h2>
+
+<ul>
+<li><strong>A CSRF token</strong>, on every <code>post()</code> form. Not a line of boilerplate you could forget.</li>
+<li><strong>Escaped output.</strong> There is no method on a form that emits raw HTML, so a rejected submission's values go back into the page as values rather than markup.</li>
+<li><strong>Labels tied to inputs</strong>, with <code>aria-describedby</code> pointing at hints and errors, and <code>aria-invalid</code> on the fields that failed.</li>
+<li><strong>Passwords are never echoed back</strong> on redisplay.</li>
+<li><strong>Selects are re-checked server-side</strong> against the options they were rendered with — the browser is not trusted to have offered only what it was given.</li>
+</ul>
+
+<h2>Fields</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-class">Field</span>::<span class="tk-fn">text</span><span class="tk-p">(</span><span class="tk-string">&#039;name&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>       <span class="tk-class">Field</span>::<span class="tk-fn">email</span><span class="tk-p">(</span><span class="tk-string">&#039;email&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>     <span class="tk-class">Field</span>::<span class="tk-fn">password</span><span class="tk-p">(</span><span class="tk-string">&#039;password&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-class">Field</span>::<span class="tk-fn">textarea</span><span class="tk-p">(</span><span class="tk-string">&#039;body&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-class">Field</span>::<span class="tk-fn">number</span><span class="tk-p">(</span><span class="tk-string">&#039;quantity&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span> <span class="tk-class">Field</span>::<span class="tk-fn">url</span><span class="tk-p">(</span><span class="tk-string">&#039;website&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-class">Field</span>::<span class="tk-fn">tel</span><span class="tk-p">(</span><span class="tk-string">&#039;phone&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>       <span class="tk-class">Field</span>::<span class="tk-fn">date</span><span class="tk-p">(</span><span class="tk-string">&#039;starts_on&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>  <span class="tk-class">Field</span>::<span class="tk-fn">checkbox</span><span class="tk-p">(</span><span class="tk-string">&#039;terms&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-class">Field</span>::<span class="tk-fn">select</span><span class="tk-p">(</span><span class="tk-string">&#039;topic&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;General&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;Support&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-class">Field</span>::<span class="tk-fn">text</span><span class="tk-p">(</span><span class="tk-string">&#039;name&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">label</span><span class="tk-p">(</span><span class="tk-string">&#039;Your full name&#039;</span><span class="tk-p">)</span>      <span class="tk-comment">// otherwise derived from the field name</span>
+    -&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">min</span><span class="tk-p">(</span><span class="tk-num">2</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">max</span><span class="tk-p">(</span><span class="tk-num">80</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">hint</span><span class="tk-p">(</span><span class="tk-string">&#039;As it appears on your account&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">placeholder</span><span class="tk-p">(</span><span class="tk-string">&#039;Ada Lovelace&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">autocomplete</span><span class="tk-p">(</span><span class="tk-string">&#039;name&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Fields and forms are immutable, so a form may be defined once — at boot, or in a small class of its own — and rendered on every request. Nothing about a visitor sticks to it.</p>
+
+<h2>Honeypot</h2>
+
+<p>Two cheap checks that ask a person for nothing.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Form\Honeypot</span><span class="tk-p">;</span>
+
+<span class="tk-var">$form</span> <span class="tk-p">=</span> <span class="tk-var">$form</span>-&gt;<span class="tk-fn">protectWith</span><span class="tk-p">(</span><span class="tk-keyword">new</span> <span class="tk-fn">Honeypot</span><span class="tk-p">(</span><span class="tk-var">$signer</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p><strong>A decoy field</strong> a person never sees and a script fills because it fills everything. <strong>A signed timestamp</strong> saying when the form was rendered: submissions arriving faster than a person could type are refused, and ones arriving hours later have gone stale. Signed rather than stored, so it costs no session state and survives a visitor with several tabs open.</p>
+
+<div class="note">
+<b>Hidden by HTML, not by a stylesheet</b>
+<p>The decoy sits in a <code>&lt;div hidden aria-hidden="true"&gt;</code>. This framework ships no inline CSS, and a class whose rule someone forgets to copy into their own stylesheet would leave the trap visible — and then reject the real people who dutifully fill it in. The <code>hidden</code> attribute is honoured by the browser's own stylesheet, so it works wherever the markup does.</p>
+</div>
+
+<h2>Captcha</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Form\MathCaptcha</span><span class="tk-p">;</span>
+
+<span class="tk-var">$form</span> <span class="tk-p">=</span> <span class="tk-var">$form</span>-&gt;<span class="tk-fn">withCaptcha</span><span class="tk-p">(</span><span class="tk-keyword">new</span> <span class="tk-fn">MathCaptcha</span><span class="tk-p">(</span><span class="tk-var">$encrypter</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>A small arithmetic question — <em>What is seven plus 3?</em> — with some numbers spelled as words to defeat the obvious regex. No JavaScript, no third-party script, no images, no request leaving your server, and nothing for a screen reader to struggle with. A distorted-image captcha fails all five.</p>
+
+<p>The answer is <strong>encrypted, not signed</strong>. A signed value is still readable, and the visitor could simply read the answer out of the page source. It is also bound to the session, so a challenge solved elsewhere — by a human solving service, say — cannot be pasted into another visitor's submission, and it expires.</p>
+
+<div class="warn">
+<b>Be clear-eyed about what this stops</b>
+<p>It stops undirected scripts: the ones that post to every form they find. It will <strong>not</strong> stop someone who has decided to attack you specifically, because a language model solves arithmetic without effort. Treat it as one layer alongside the honeypot and rate limiting, not as a wall.</p>
+<p>If you need to resist a determined attacker, implement the <code>Captcha</code> interface against a service built for that job — and note that most of them need JavaScript, which is a choice for your application to make.</p>
+</div>
+
+<h2>What a rejected submission is told</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$submission</span>-&gt;<span class="tk-fn">looksAutomated</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-var">$logger</span>-&gt;<span class="tk-fn">log</span><span class="tk-p">(</span><span class="tk-class">Level</span>::<span class="tk-class">Warning</span><span class="tk-p">,</span> <span class="tk-string">&#039;form rejected&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;reason&#039;</span> =&gt; <span class="tk-var">$submission</span>-&gt;rejectedAs<span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p>The page gets one generic message. The reason — <em>the decoy field was filled in</em>, <em>submitted after 0 seconds</em> — goes to your log only. Telling the submitter which check fired tells a script author exactly what to change next.</p>
+
+<p><code>values()</code> throws if the submission was rejected, so there is no path that reads a field the checks refused. Use <code>old()</code> to repopulate the form and <code>errors()</code> to show what went wrong.</p>
+
+<h2>Defining a form once</h2>
+
+<p>Rendering and handling usually live in different controllers. Give the form its own small class so the two cannot disagree:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">ContactForm</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Signer</span> <span class="tk-var">$signer</span><span class="tk-p">,</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Encrypter</span> <span class="tk-var">$encrypter</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">build</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Form</span>
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">return</span> <span class="tk-class">Form</span>::<span class="tk-fn">post</span><span class="tk-p">(</span><span class="tk-string">&#039;/contact&#039;</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">add</span><span class="tk-p">(</span><span class="tk-comment">/* … */</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">protectWith</span><span class="tk-p">(</span><span class="tk-keyword">new</span> <span class="tk-fn">Honeypot</span><span class="tk-p">(</span><span class="tk-var">$this</span>-&gt;signer<span class="tk-p">)</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">withCaptcha</span><span class="tk-p">(</span><span class="tk-keyword">new</span> <span class="tk-fn">MathCaptcha</span><span class="tk-p">(</span><span class="tk-var">$this</span>-&gt;encrypter<span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p>The demo application does exactly this — see <code>/contact</code> on a running server, and read the page source: the decoy is visible in the markup, and the captcha's sealed answer is not.</p>
+
+<p><code>orbit make:form Contact --controllers</code> writes that class, the two controllers built against it and the template, with the honeypot already attached — see <a href="cli.html">The orbit CLI</a>.</p>
+
+<h2>Not built</h2>
+
+<ul>
+<li><strong>File inputs.</strong> Uploads have their own quotas and cleanup contract; see <a href="uploads.html">File uploads</a>.</li>
+<li><strong>Radio groups and multi-selects.</strong> A select covers the common case; anything richer is markup you write yourself around the same <code>Validator</code>.</li>
+<li><strong>Client-side validation.</strong> The rendered attributes (<code>required</code>, <code>maxlength</code>, <code>type</code>) are what the browser needs; the form carries <code>novalidate</code> so your messages are shown rather than the browser's, and every rule is enforced on the server regardless.</li>
+<li><strong>Rate limiting.</strong> Worth adding in front of any public form — <code>LoginThrottle</code> shows the shape.</li>
+</ul>
+    </article>
+    <nav class="pager"><a href="responses.html"><span>Previous</span>Responses</a><a class="next" href="container.html"><span>Next</span>Container</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

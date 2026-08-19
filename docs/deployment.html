@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deployment — phporbit</title>
+<meta name="description" content="Configuration for FrankenPHP, nginx+FPM and Apache, plus the checklist before you go live.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html" class="current" aria-current="page">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Deployment</h1>
+        <p class="summary">Configuration for FrankenPHP, nginx+FPM and Apache, plus the checklist before you go live.</p>
+        <p>The same application runs on all three. Nothing in <code>app/</code> or <code>src/</code> changes — only the server configuration and which adapter <code>public/index.php</code> selects, which it does by itself.</p>
+
+<h2>Before you go live</h2>
+
+<ul>
+<li><code>APP_DEBUG=false</code>. Debug mode puts stack traces, file paths and SQL into responses.</li>
+<li><code>APP_URL</code> set to the real origin, so generated absolute URLs and link previews are right.</li>
+<li>Configuration supplied by the environment, not a <code>.env</code> on the server.</li>
+<li><code>./orbit migrate</code> run as a deploy step — never at boot.</li>
+<li>Document root pointed at <code>public/</code>, so <code>.env</code>, <code>storage/</code> and <code>vendor/</code> are unreachable.</li>
+<li><code>storage/</code> writable by the web server user; <code>chmod 750</code> is usually right.</li>
+<li>HTTPS terminated, and <code>TRUSTED_PROXIES</code> set if you are behind a load balancer.</li>
+<li><code>composer install --no-dev --optimize-autoloader</code>.</li>
+</ul>
+
+<h2>FrankenPHP (worker mode)</h2>
+
+<p>The fastest option, and the one that shares its process model with <code>./orbit serve</code>.</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code># Caddyfile
+example.test {
+    root * /srv/app/public
+    encode zstd gzip
+
+    php_server {
+        worker /srv/app/public/index.php
+    }
+}</code></pre></figure>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>frankenphp run --config /etc/caddy/Caddyfile</code></pre></figure>
+
+<p><code>public/index.php</code> detects FrankenPHP and uses the worker adapter, which boots the application once and then serves requests in a loop, collecting cycles between them.</p>
+
+<div class="warn">
+<b>Deploying a worker needs a restart</b>
+<p>The application is booted once per worker process, so new code is not picked up until the workers restart. Reload FrankenPHP as part of your deploy, after migrations have run.</p>
+</div>
+
+<h2>nginx + PHP-FPM</h2>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>server {
+    listen 443 ssl http2;
+    server_name example.test;
+    root /srv/app/public;
+    index index.php;
+
+    # Real files first; everything else goes to the front controller.
+    location / {
+        try_files $uri $uri/ /index.php$is_args$args;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTPS on;
+    }
+
+    # Dotfiles are never served. The framework refuses them too — two
+    # independent protections, because this line gets lost in a refactor.
+    location ~ /\. {
+        deny all;
+    }
+
+    client_max_body_size 8m;
+}</code></pre></figure>
+
+<p>Static files are served by nginx directly, before PHP is invoked, so <code>ServeStaticFiles</code> never runs here. That is the intended arrangement — it is considerably faster.</p>
+
+<h2>Apache</h2>
+
+<p><code>public/.htaccess</code> ships with the framework:</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>&lt;IfModule mod_rewrite.c&gt;
+    RewriteEngine On
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+&lt;/IfModule&gt;
+
+&lt;FilesMatch &quot;^\.&quot;&gt;
+    Require all denied
+&lt;/FilesMatch&gt;</code></pre></figure>
+
+<p>The virtual host needs <code>AllowOverride All</code>, or the rewrite rules are ignored and every URL 404s:</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>&lt;VirtualHost *:443&gt;
+    ServerName example.test
+    DocumentRoot /srv/app/public
+
+    &lt;Directory /srv/app/public&gt;
+        AllowOverride All
+        Require all granted
+    &lt;/Directory&gt;
+&lt;/VirtualHost&gt;</code></pre></figure>
+
+<h2>Configuration in production</h2>
+
+<p>The real environment wins over <code>.env</code>, so inject settings the way your platform prefers:</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code># systemd unit
+[Service]
+Environment=APP_DEBUG=false
+Environment=APP_URL=https://example.test
+Environment=DB_DATABASE=/var/lib/app/app.sqlite
+EnvironmentFile=/etc/app/secrets.env</code></pre></figure>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code># docker-compose
+services:
+  app:
+    environment:
+      APP_DEBUG: &quot;false&quot;
+      APP_URL: &quot;https://example.test&quot;
+    secrets:
+      - db_password</code></pre></figure>
+
+<p>A stale <code>.env</code> left on a server cannot override these, which is the point of that rule.</p>
+
+<h2>Behind a load balancer</h2>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-var">TRUSTED_PROXIES</span><span class="tk-p">=</span><span class="tk-string">10.0.0.1,10.0.0.2</span></code></pre></figure>
+
+<p><code>X-Forwarded-Proto</code> is believed only from these addresses. Without the list it is ignored entirely — otherwise anyone could claim their plaintext request was HTTPS and unlock Secure-only cookies.</p>
+
+<h2>A deploy sequence</h2>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>git pull
+<span class="tk-p">$ </span>composer install --no-dev --optimize-autoloader
+<span class="tk-p">$ </span>./orbit migrate                      # before the new code starts serving
+<span class="tk-p">$ </span>systemctl reload frankenphp          # or php8.3-fpm</code></pre></figure>
+
+<p>Migrations first, so the new schema exists before any process that expects it starts serving. Run them from exactly one host — the ledger prevents double-application, but two concurrent runs can still race.</p>
+
+<h2>Housekeeping</h2>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-comment"># Expired sessions and stale login attempts</span>
+0 3 * * *  cd /srv/app &amp;&amp; php orbit sessions:gc</code></pre></figure>
+
+<p>Neither is required for correctness — expired sessions are refused on read, and old attempts fall outside the throttle window — but both directories otherwise grow forever.</p>
+
+<h2>Which target should you choose?</h2>
+
+<div class="scroller">
+<table>
+<thead><tr><th>Situation</th><th>Choice</th></tr></thead>
+<tbody>
+<tr><td>New deployment, containers, want speed</td><td><strong>FrankenPHP.</strong> Boots once, same model as your dev server.</td></tr>
+<tr><td>Existing nginx infrastructure</td><td><strong>nginx + FPM.</strong> Boring, well understood, per-request isolation.</td></tr>
+<tr><td>Shared or legacy hosting</td><td><strong>Apache.</strong> Works with <code>.htaccess</code> and no root access.</td></tr>
+<tr><td>Anything at all</td><td><strong>Not <code>./orbit serve</code>.</strong> It serves connections sequentially.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Because the application is identical across all of them, moving later is a configuration change rather than a rewrite — which is the whole point of the constraint the framework is built around.</p>
+    </article>
+    <nav class="pager"><a href="testing.html"><span>Previous</span>Testing</a><span></span></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

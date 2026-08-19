@@ -1,0 +1,12 @@
+parameters:
+    level: max
+    paths:
+        - app
+        - database
+        - tests
+        - public
+
+    # No baseline and no ignoreErrors: a finding is a defect to fix, not a
+    # warning to record. A baseline turns "we have no type errors" into "we have
+    # a list of type errors we have agreed not to look at".
+    treatPhpDocTypesAsCertain: true

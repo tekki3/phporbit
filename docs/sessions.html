@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sessions — phporbit</title>
+<meta name="description" content="Reading and writing session data, flash messages, regeneration, and why PHP's own sessions are not used.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html" class="current" aria-current="page">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Sessions</h1>
+        <p class="summary">Reading and writing session data, flash messages, regeneration, and why PHP's own sessions are not used.</p>
+        <div class="note">
+<b>Not PHP's sessions</b>
+<p><code>session_start()</code> and <code>$_SESSION</code> are process-global. Under a worker that means one visitor's data is still in memory when the next request arrives — a session leak with no symptoms until it is a breach. phporbit implements its own, per-request and disposable. The portability test fails the build if the session extension is used anywhere.</p>
+</div>
+
+<h2>Using it</h2>
+
+<p>Inject <code>Session</code>; <code>SessionMiddleware</code> publishes it:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Session\Session</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">PreferencesController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span><span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Session</span> <span class="tk-var">$session</span><span class="tk-p">)</span>
+    <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$this</span>-&gt;session-&gt;<span class="tk-fn">set</span><span class="tk-p">(</span><span class="tk-string">&#039;theme&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;dark&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">redirect</span><span class="tk-p">(</span><span class="tk-string">&#039;/&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<h2>Reading and writing</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$session</span>-&gt;<span class="tk-fn">set</span><span class="tk-p">(</span><span class="tk-string">&#039;theme&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;dark&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>        <span class="tk-comment">// string|int|float|bool</span>
+<span class="tk-var">$session</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;theme&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>                <span class="tk-comment">// ?string</span>
+<span class="tk-var">$session</span>-&gt;<span class="tk-fn">getInt</span><span class="tk-p">(</span><span class="tk-string">&#039;items&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>             <span class="tk-comment">// ?int</span>
+<span class="tk-var">$session</span>-&gt;<span class="tk-fn">getBool</span><span class="tk-p">(</span><span class="tk-string">&#039;onboarded&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>        <span class="tk-comment">// bool</span>
+<span class="tk-var">$session</span>-&gt;<span class="tk-fn">has</span><span class="tk-p">(</span><span class="tk-string">&#039;theme&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>                <span class="tk-comment">// bool</span>
+<span class="tk-var">$session</span>-&gt;<span class="tk-fn">remove</span><span class="tk-p">(</span><span class="tk-string">&#039;theme&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$session</span>-&gt;<span class="tk-fn">all</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                       <span class="tk-comment">// array&lt;string, scalar&gt;</span></code></pre></figure>
+
+<div class="warn">
+<b>Scalars only</b>
+<p>Storing objects would mean serialising user-influenced data and unserialising it later, which is a well-known route to remote code execution. Store an id and reload the object.</p>
+</div>
+
+<h2>Flash messages</h2>
+
+<p>For the redirect-after-write pattern — write, flash, redirect, show once:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$this</span>-&gt;session-&gt;<span class="tk-fn">flash</span><span class="tk-p">(</span><span class="tk-string">&#039;notice&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;Article published.&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">redirect</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// On the next request — reading also removes it</span>
+<span class="tk-var">$notice</span> <span class="tk-p">=</span> <span class="tk-var">$this</span>-&gt;session-&gt;<span class="tk-fn">takeFlash</span><span class="tk-p">(</span><span class="tk-string">&#039;notice&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>@if($notice !== null)
+    &lt;p class=&quot;notice&quot;&gt;{{ $notice }}&lt;/p&gt;
+@endif</code></pre></figure>
+
+<h2>Regeneration</h2>
+
+<p>Issue a new session id whenever the privilege level changes:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$session</span>-&gt;<span class="tk-fn">regenerate</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// keeps the data, returns the old id</span></code></pre></figure>
+
+<p>Without this, an attacker who fixes a victim's session id before login still holds a valid id afterwards. <code>Authenticator::login()</code> does it for you, so calling that instead of writing the user id yourself is the safer habit.</p>
+
+<p>The old session file is deleted, so the previous id stops working immediately.</p>
+
+<h2>Destroying</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$session</span>-&gt;<span class="tk-fn">destroy</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// empties it and removes the stored file</span></code></pre></figure>
+
+<p>The response also carries an expired cookie, so the browser drops its copy.</p>
+
+<h2>Configuration</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Session\FileSessionStore</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Session\SessionMiddleware</span><span class="tk-p">;</span>
+
+<span class="tk-var">$app</span>-&gt;<span class="tk-fn">middleware</span><span class="tk-p">(</span><span class="tk-keyword">new</span> <span class="tk-fn">SessionMiddleware</span><span class="tk-p">(</span>
+    <span class="tk-keyword">new</span> <span class="tk-fn">FileSessionStore</span><span class="tk-p">(</span><span class="tk-var">$storage</span> <span class="tk-p">.</span> <span class="tk-string">&#039;/sessions&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    cookieName<span class="tk-p">:</span> <span class="tk-string">&#039;orbit_session&#039;</span><span class="tk-p">,</span>
+    lifetimeSeconds<span class="tk-p">:</span> <span class="tk-num">7200</span><span class="tk-p">,</span>
+    sameSite<span class="tk-p">:</span> <span class="tk-class">SameSite</span>::<span class="tk-class">Lax</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-var">SESSION_LIFETIME</span><span class="tk-p">=</span><span class="tk-string">7200</span>
+<span class="tk-var">SESSION_COOKIE</span><span class="tk-p">=</span><span class="tk-string">orbit_session</span></code></pre></figure>
+
+<div class="note">
+<b>Order matters</b>
+<p><code>SessionMiddleware</code> must run before <code>CsrfMiddleware</code>, which reads the token it holds. Register it first.</p>
+</div>
+
+<h2>What the framework does for you</h2>
+
+<h3>No session file for anonymous visitors</h3>
+
+<p>A session is only written once something is actually stored. Someone who reads one page and leaves does not leave a file behind.</p>
+
+<h3>Unknown ids are never adopted</h3>
+
+<p>A cookie naming a session that does not exist gets a <em>new</em> session, not that id. Honouring it is precisely what makes session fixation possible.</p>
+
+<h3>Ids never reach the filesystem unvalidated</h3>
+
+<p>Ids are 256 bits of hex and are matched against a strict pattern before any file operation. A crafted cookie cannot steer a read or a write out of the session directory.</p>
+
+<h3>Writes are atomic</h3>
+
+<p>Data is written to a temporary file and renamed, which is atomic on POSIX filesystems. A reader sees either the old session or the new one, never a half-written file — which matters under the built-in server and FrankenPHP, where requests can touch one session in quick succession. Files are stored at mode <code>0600</code>.</p>
+
+<h3>Corrupt files fail soft</h3>
+
+<p>An unreadable or malformed session file is treated as no session at all. The visitor gets a fresh one rather than an error page.</p>
+
+<h2>Expiry</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$store</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-fn">FileSessionStore</span><span class="tk-p">(</span><span class="tk-var">$storage</span> <span class="tk-p">.</span> <span class="tk-string">&#039;/sessions&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$removed</span> <span class="tk-p">=</span> <span class="tk-var">$store</span>-&gt;<span class="tk-fn">collectGarbage</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// deletes expired files, returns the count</span></code></pre></figure>
+
+<p>Expiry is stored in the file, so an expired session is refused on read even if the file is still there. Run <code>collectGarbage()</code> from cron for housekeeping.</p>
+
+<h2>Another store</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Session\SessionStore</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">RedisSessionStore</span> <span class="tk-keyword">implements</span> <span class="tk-class">SessionStore</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">read</span><span class="tk-p">(</span><span class="tk-keyword">string</span> <span class="tk-var">$id</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-p">?</span>array <span class="tk-p">{</span> <span class="tk-comment">/* … */</span> <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">write</span><span class="tk-p">(</span><span class="tk-keyword">string</span> <span class="tk-var">$id</span><span class="tk-p">,</span> array <span class="tk-var">$data</span><span class="tk-p">,</span> <span class="tk-keyword">int</span> <span class="tk-var">$lifetimeSeconds</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span> <span class="tk-p">{</span> <span class="tk-comment">/* … */</span> <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">destroy</span><span class="tk-p">(</span><span class="tk-keyword">string</span> <span class="tk-var">$id</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span> <span class="tk-p">{</span> <span class="tk-comment">/* … */</span> <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">collectGarbage</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">int</span> <span class="tk-p">{</span> <span class="tk-keyword">return</span> <span class="tk-num">0</span><span class="tk-p">;</span> <span class="tk-p">}</span>   <span class="tk-comment">// Redis expires keys itself</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p>Worth doing once you run more than one application server, since file sessions are local to a machine.</p>
+
+<h2>Worker safety</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">test_sessions_do_not_leak_between_visitors</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+<span class="tk-p">{</span>
+    <span class="tk-var">$app</span> <span class="tk-p">=</span> <span class="tk-var">$this</span>-&gt;<span class="tk-fn">bootApplication</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-var">$first</span> <span class="tk-p">=</span> <span class="tk-var">$app</span>-&gt;<span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">Requests</span>::<span class="tk-fn">post</span><span class="tk-p">(</span><span class="tk-string">&#039;/preferences&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;theme=dark&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-var">$cookie</span> <span class="tk-p">=</span> <span class="tk-var">$this</span>-&gt;<span class="tk-fn">sessionCookieFrom</span><span class="tk-p">(</span><span class="tk-var">$first</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-comment">// A different visitor, same process.</span>
+    <span class="tk-var">$second</span> <span class="tk-p">=</span> <span class="tk-var">$app</span>-&gt;<span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">Requests</span>::<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/preferences&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-keyword">self</span>::<span class="tk-fn">assertStringNotContainsString</span><span class="tk-p">(</span><span class="tk-string">&#039;dark&#039;</span><span class="tk-p">,</span> <span class="tk-var">$second</span>-&gt;body<span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p>Tests like this live in <code>tests/Worker/</code> and boot once, handling several requests — the only way this class of bug is visible. <a href="testing.html">More &rarr;</a></p>
+    </article>
+    <nav class="pager"><a href="security.html"><span>Previous</span>Security</a><a class="next" href="auth.html"><span>Next</span>Authentication</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

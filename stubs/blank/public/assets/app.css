@@ -1,0 +1,110 @@
+/* A starting point, not a framework. Dark is the base palette; light is a full
+   token swap under prefers-color-scheme rather than an inversion.
+
+   All CSS lives here: no <style> blocks, no style= attributes. */
+
+:root {
+    --ground: #10131a;
+    --panel: #171b24;
+    --panel-2: #1e2431;
+    --line: #2a3140;
+    --ink: #e6e9ef;
+    --muted: #98a2b8;
+    --accent: #58a6ff;
+
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --radius: 12px;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --ground: #fbfcfd;
+        --panel: #ffffff;
+        --panel-2: #f4f6fa;
+        --line: #dee3ea;
+        --ink: #1c2128;
+        --muted: #59636e;
+        --accent: #0969da;
+    }
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 15px/1.65 var(--sans);
+    -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+.skip { position: absolute; left: -9999px; background: var(--accent); color: #fff; padding: .6rem 1rem; }
+.skip:focus { left: 0; }
+
+code {
+    font-family: var(--mono);
+    font-size: .875em;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: .1em .38em;
+}
+
+.masthead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: .9rem clamp(1rem, 4vw, 2.5rem);
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+}
+
+.brand { font-weight: 700; text-decoration: none; color: var(--ink); letter-spacing: -.01em; }
+.masthead nav { display: flex; gap: .35rem; flex-wrap: wrap; }
+.masthead nav a { color: var(--muted); text-decoration: none; padding: .35rem .7rem; border-radius: 7px; }
+.masthead nav a:hover { color: var(--ink); background: var(--panel-2); }
+
+main { max-width: 46rem; margin: 0 auto; padding: 3rem clamp(1rem, 4vw, 2.5rem) 4rem; }
+
+h1 { margin: 0 0 .75rem; font-size: clamp(1.8rem, 4vw, 2.4rem); letter-spacing: -.025em; line-height: 1.15; }
+h2 { margin: 0 0 .6rem; font-size: 1.1rem; letter-spacing: -.01em; }
+p { margin: 0 0 1rem; }
+p:last-child { margin-bottom: 0; }
+
+.lede { color: var(--muted); font-size: 1.05rem; margin-bottom: 2rem; }
+
+.card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+.card ul { margin: 0; padding-left: 1.1rem; }
+.card li { margin-bottom: .4rem; }
+.card li:last-child { margin-bottom: 0; }
+
+.site-footer {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 1.5rem clamp(1rem, 4vw, 2.5rem) 3rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+.muted { color: var(--muted); font-size: .9rem; }
+
+/* Generated forms (PhpOrbit\Form). The label carries its own inline marker, so
+   it must not become a grid container the way a bare label does above. */
+.field { display: grid; gap: .35rem; margin: 0 0 1.1rem; }
+.field label { display: block; }
+.field .hint { color: var(--muted); font-size: .82rem; }
+.field .error { color: var(--fail); font-size: .85rem; font-weight: 500; }
+.field [aria-invalid="true"] { border-color: var(--fail); }

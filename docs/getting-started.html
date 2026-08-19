@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started — phporbit</title>
+<meta name="description" content="Install, migrate, seed, serve — then add your first route, controller and template.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html" class="current" aria-current="page">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Getting started</h1>
+        <p class="summary">Install, migrate, seed, serve — then add your first route, controller and template.</p>
+        <h2>Requirements</h2>
+
+<ul>
+<li><strong>PHP 8.3 or newer</strong>, with <code>pdo_sqlite</code>, <code>mbstring</code> and <code>fileinfo</code>.</li>
+<li><strong>Composer</strong>.</li>
+<li><code>sockets</code> and <code>pcntl</code> for the built-in server (present in most CLI builds).</li>
+</ul>
+
+<h2>Starting a project</h2>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>orbit new my-app          # a blank application
+<span class="tk-p">$ </span>orbit new my-app --demo   # or the demo, with auth, uploads and the self-check
+
+<span class="tk-p">$ </span>cd my-app
+<span class="tk-p">$ </span>composer install
+<span class="tk-p">$ </span>./orbit migrate
+<span class="tk-p">$ </span>./orbit serve</code></pre></figure>
+
+<p>Open <code>http://127.0.0.1:8080</code>. <a href="cli.html">More on <code>orbit new</code> &rarr;</a></p>
+
+<h2>Running this repository</h2>
+
+<p>If you cloned phporbit itself rather than scaffolding from it:</p>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>composer install
+<span class="tk-p">$ </span>cp .env.example .env
+<span class="tk-p">$ </span>./orbit migrate
+<span class="tk-p">$ </span>./orbit db:seed
+<span class="tk-p">$ </span>./orbit serve</code></pre></figure>
+
+<p>Open <code>http://127.0.0.1:8080</code>. You get a self-check page that exercises routing, sessions, CSRF, migrations, the query builder, escaping and worker isolation, and reports pass or fail for each.</p>
+
+<div class="note">
+<b>What those commands did</b>
+<p><code>migrate</code> created the schema and recorded it in a ledger table. <code>db:seed</code> created a demo account (<code>demo@example.test</code> / <code>correct-horse-battery</code>). <code>serve</code> started phporbit's own HTTP server, which applies any pending migrations first as a development convenience.</p>
+</div>
+
+<h2>Your first route</h2>
+
+<p>Routes live in <code>app/routes.php</code>. Add one:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Response</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Routing\RouteCollection</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">return</span> <span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-p">(</span><span class="tk-class">RouteCollection</span> <span class="tk-var">$routes</span><span class="tk-p">,</span> <span class="tk-keyword">bool</span> <span class="tk-var">$debug</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span> <span class="tk-p">{</span>
+    <span class="tk-comment">// ... existing routes ...</span>
+
+    <span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/ping&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span> =&gt; <span class="tk-class">Response</span>::<span class="tk-fn">json</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;pong&#039;</span> =&gt; <span class="tk-keyword">true</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">,</span> <span class="tk-string">&#039;ping&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Reload. No build step, no cache to clear — the server re-reads the application on each request in development.</p>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>curl http://127.0.0.1:8080/ping
+{&quot;pong&quot;:true}</code></pre></figure>
+
+<h2>Your first controller</h2>
+
+<p>A closure is fine for one-liners. Anything with dependencies belongs in a class implementing <code>Handler</code>:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// app/src/Controllers/GreetController.php</span>
+<span class="tk-keyword">namespace</span> <span class="tk-class">App\Controllers</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Response</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\ServerRequest</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Routing\Handler</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\View\TemplateEngine</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">GreetController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-comment">// Constructor dependencies are resolved automatically, per request.</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">TemplateEngine</span> <span class="tk-var">$view</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;greet&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+            <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-string">&#039;Greetings&#039;</span><span class="tk-p">,</span>
+            <span class="tk-string">&#039;name&#039;</span> =&gt; <span class="tk-var">$request</span>-&gt;<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-string">&#039;name&#039;</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;world&#039;</span><span class="tk-p">,</span>
+        <span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/greet/{name}&#039;</span><span class="tk-p">,</span> <span class="tk-class">GreetController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;greet&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Your first template</h2>
+
+<p>Templates are <code>app/templates/*.orbit.php</code>. <code>{{ }}</code> escapes; nothing else needed:</p>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>{# app/templates/greet.orbit.php #}
+@extends(&#039;layout&#039;)
+
+@section(&#039;content&#039;)
+    &lt;h1&gt;Hello, {{ $name }}&lt;/h1&gt;
+
+    &lt;p&gt;Try /greet/&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt; and view the source.&lt;/p&gt;
+@endsection</code></pre></figure>
+
+<p>The payload arrives as text, not markup, because escaping is what <code>{{ }}</code> does — not something this template remembered to ask for.</p>
+
+<h2>Storing something</h2>
+
+<p>Write a migration, run it, then use the query builder:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// database/migrations/0004_create_pings.php</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Connection</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Migration</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">return</span> <span class="tk-keyword">new</span> <span class="tk-keyword">class</span> <span class="tk-keyword">implements</span> <span class="tk-class">Migration</span> <span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">up</span><span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span>
+            <span class="tk-string">&#039;CREATE TABLE pings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                note TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )&#039;</span><span class="tk-p">,</span>
+        <span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">down</span><span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-string">&#039;DROP TABLE pings&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span><span class="tk-p">;</span></code></pre></figure>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit migrate
+Applied 0004_create_pings</code></pre></figure>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Connection</span><span class="tk-p">;</span>
+
+<span class="tk-var">$id</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;pings&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">insert</span><span class="tk-p">(</span><span class="tk-p">[</span>
+    <span class="tk-string">&#039;note&#039;</span> =&gt; <span class="tk-string">&#039;first&#039;</span><span class="tk-p">,</span>
+    <span class="tk-string">&#039;created_at&#039;</span> =&gt; <span class="tk-fn">gmdate</span><span class="tk-p">(</span><span class="tk-string">&#039;c&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+<span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$recent</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;pings&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;note&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;!=&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">orderBy</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">,</span> <span class="tk-class">Direction</span>::<span class="tk-class">Descending</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">limit</span><span class="tk-p">(</span><span class="tk-num">10</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Project layout</h2>
+
+<div class="scroller">
+<table>
+<thead><tr><th>Path</th><th>What lives there</th></tr></thead>
+<tbody>
+<tr><td><code>app/routes.php</code></td><td>Route declarations</td></tr>
+<tr><td><code>app/bootstrap.php</code></td><td>Boot phase: services, middleware, configuration</td></tr>
+<tr><td><code>app/src/</code></td><td>Your classes (<code>App\</code> namespace)</td></tr>
+<tr><td><code>app/templates/</code></td><td><code>*.orbit.php</code> templates</td></tr>
+<tr><td><code>database/migrations/</code></td><td>Schema changes</td></tr>
+<tr><td><code>public/</code></td><td>Document root: front controller, assets</td></tr>
+<tr><td><code>storage/</code></td><td>Sessions, compiled templates, SQLite file (git-ignored)</td></tr>
+<tr><td><code>src/</code></td><td>The framework itself</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>Useful commands</h2>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit serve --port=9000 --debug   # --debug shows exceptions, recompiles templates
+<span class="tk-p">$ </span>./orbit routes                      # print the compiled route table
+<span class="tk-p">$ </span>./orbit migrate:status              # what has run, and what has not
+<span class="tk-p">$ </span>composer test                       # the test suite
+<span class="tk-p">$ </span>composer stan                       # static analysis at max level</code></pre></figure>
+
+<div class="warn">
+<b>One thing to avoid</b>
+<p>Do not use <code>php -S</code> as your development server. It works, and it is a quick way to exercise the per-request path, but it is not one of the four supported targets and it does not share the pipeline that production uses. <code>./orbit serve</code> runs the same code as FrankenPHP, which is what makes a bug reproducible on your machine.</p>
+</div>
+    </article>
+    <nav class="pager"><a href="index.html"><span>Previous</span>phporbit</a><a class="next" href="architecture.html"><span>Next</span>Architecture</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

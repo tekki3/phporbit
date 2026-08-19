@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configuration — phporbit</title>
+<meta name="description" content="The .env file, typed access, and why the real environment always wins.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html" class="current" aria-current="page">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Configuration</h1>
+        <p class="summary">The .env file, typed access, and why the real environment always wins.</p>
+        <p>Configuration is read <strong>once at boot</strong> into an immutable <code>Environment</code>, registered as a singleton. A worker touches the filesystem once per process, and settings cannot drift mid-process — every request sees the same values.</p>
+
+<h2>The .env file</h2>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-comment"># Copy .env.example to .env. The file is git-ignored; the example is not.</span>
+
+<span class="tk-var">APP_DEBUG</span><span class="tk-p">=</span><span class="tk-string">false</span>
+<span class="tk-var">APP_URL</span><span class="tk-p">=</span><span class="tk-string">http://localhost:8080</span>
+<span class="tk-var">LOG_LEVEL</span><span class="tk-p">=</span><span class="tk-string">info</span>
+
+<span class="tk-var">DB_DATABASE</span><span class="tk-p">=</span><span class="tk-string">storage/app.sqlite</span>
+
+<span class="tk-var">SESSION_LIFETIME</span><span class="tk-p">=</span><span class="tk-string">7200</span>
+<span class="tk-var">SESSION_COOKIE</span><span class="tk-p">=</span><span class="tk-string">orbit_session</span>
+
+<span class="tk-var">UPLOAD_MAX_BYTES</span><span class="tk-p">=</span><span class="tk-string">1048576</span>
+<span class="tk-var">LOGIN_MAX_ATTEMPTS</span><span class="tk-p">=</span><span class="tk-string">5</span>
+<span class="tk-var">LOGIN_WINDOW_SECONDS</span><span class="tk-p">=</span><span class="tk-string">900</span>
+
+<span class="tk-var">TRUSTED_PROXIES</span><span class="tk-p">=</span><span class="tk-string"></span></code></pre></figure>
+
+<div class="warn">
+<b>The real environment wins</b>
+<p>Values already present in the process environment override the file. The <code>.env</code> is a development convenience and a source of defaults; in production the values injected by systemd, Docker or Kubernetes are the ones that must apply, and <strong>a stale <code>.env</code> left on a server must never override them</strong>.</p>
+<p><code>./orbit serve --debug</code> works by setting <code>APP_DEBUG</code> in the process environment — the same rule, not an exception to it.</p>
+</div>
+
+<h2>Reading settings</h2>
+
+<p>There is no <code>get(): mixed</code>. Everything in a <code>.env</code> is a string, and the conversion has to happen somewhere; doing it here means a bad value fails at boot with a readable message instead of behaving strangely later.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Config\Environment</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">ReportController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span><span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Environment</span> <span class="tk-var">$config</span><span class="tk-p">)</span>
+    <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$perPage</span> <span class="tk-p">=</span> <span class="tk-var">$this</span>-&gt;config-&gt;<span class="tk-keyword">int</span><span class="tk-p">(</span><span class="tk-string">&#039;REPORT_PAGE_SIZE&#039;</span><span class="tk-p">,</span> <span class="tk-num">50</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-var">$verbose</span> <span class="tk-p">=</span> <span class="tk-var">$this</span>-&gt;config-&gt;<span class="tk-keyword">bool</span><span class="tk-p">(</span><span class="tk-string">&#039;REPORT_VERBOSE&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">false</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-var">$title</span>   <span class="tk-p">=</span> <span class="tk-var">$this</span>-&gt;config-&gt;<span class="tk-keyword">string</span><span class="tk-p">(</span><span class="tk-string">&#039;REPORT_TITLE&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;Monthly report&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-comment">// ...</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<div class="scroller">
+<table>
+<thead><tr><th>Method</th><th>Behaviour</th></tr></thead>
+<tbody>
+<tr><td><code>string($key, $default = null)</code></td><td>Throws if absent and no default given.</td></tr>
+<tr><td><code>required($key)</code></td><td>Throws if absent <em>or blank</em>. Use for secrets.</td></tr>
+<tr><td><code>int($key, $default = null)</code></td><td>Throws unless the value is digits, optionally signed.</td></tr>
+<tr><td><code>bool($key, $default = null)</code></td><td>Accepts true/false, 1/0, yes/no, on/off. Anything else throws.</td></tr>
+<tr><td><code>strings($key, $default = [])</code></td><td>Comma-separated list, blanks dropped.</td></tr>
+<tr><td><code>path($key, $root, $default = null)</code></td><td>Resolves relative values against the project root.</td></tr>
+<tr><td><code>raw($key)</code></td><td>The literal string, or <code>null</code>. Blank and absent are distinguishable.</td></tr>
+<tr><td><code>has($key)</code>, <code>keys()</code></td><td>Presence, and the key names (never values).</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>required() versus string()</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// APP_KEY= (present, but blank)</span>
+
+<span class="tk-var">$config</span>-&gt;<span class="tk-keyword">string</span><span class="tk-p">(</span><span class="tk-string">&#039;APP_KEY&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// returns &#039;&#039; — present, technically</span>
+<span class="tk-var">$config</span>-&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-string">&#039;APP_KEY&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>  <span class="tk-comment">// throws: &quot;present but empty&quot;</span></code></pre></figure>
+
+<p>For a secret those are the same problem, which is why <code>required()</code> exists.</p>
+
+<h3>path() and the working directory</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// DB_DATABASE=storage/app.sqlite</span>
+<span class="tk-var">$config</span>-&gt;<span class="tk-fn">path</span><span class="tk-p">(</span><span class="tk-string">&#039;DB_DATABASE&#039;</span><span class="tk-p">,</span> <span class="tk-var">$root</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// /srv/app/storage/app.sqlite</span>
+
+<span class="tk-comment">// Absolute values and driver-specific ones pass through untouched.</span>
+<span class="tk-comment">// DB_DATABASE=/var/lib/app.sqlite  →  /var/lib/app.sqlite</span>
+<span class="tk-comment">// DB_DATABASE=:memory:             →  :memory:</span></code></pre></figure>
+
+<p>Without this, whether a relative path works depends on the directory the process happened to start in — which differs between the CLI, a web server and cron.</p>
+
+<h2>Typos fail at boot</h2>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit routes
+Configuration error: Setting &quot;APP_DEBUG&quot; is not a valid boolean.
+Accepted values: true/false, 1/0, yes/no, on/off.</code></pre></figure>
+
+<p>A typo'd <code>APP_DEBUG=treu</code> that silently became <code>false</code> would hide errors; one that became <code>true</code> would put stack traces in production. Neither is acceptable, so it refuses to start.</p>
+
+<h2>File syntax</h2>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-var">PLAIN</span><span class="tk-p">=</span><span class="tk-string">no quotes needed</span>
+<span class="tk-var">TRAILING</span><span class="tk-p">=</span><span class="tk-string">value # a comment needs a space before the hash</span>
+<span class="tk-var">HASH</span><span class="tk-p">=</span><span class="tk-string">pass#word                 # no space, so this stays part of the value</span>
+
+<span class="tk-var">QUOTED</span><span class="tk-p">=</span><span class="tk-string">&quot;escapes \n \t and ${OTHER_KEY} expansion&quot;</span>
+<span class="tk-var">LITERAL</span><span class="tk-p">=</span><span class="tk-string">&#039;no escapes, no expansion, $ and \ are ordinary&#039;</span>
+
+<span class="tk-var">MULTILINE</span><span class="tk-p">=</span><span class="tk-string">&quot;-----BEGIN KEY-----</span>
+a quoted value may span lines
+-----END KEY-----&quot;
+
+export ALSO_FINE=1</code></pre></figure>
+
+<ul>
+<li><strong>Double quotes</strong> support <code>\n \r \t \\ \" \$</code> and <code>${VAR}</code> expansion.</li>
+<li><strong>Single quotes</strong> are entirely literal — the right choice for a password containing backslashes or dollars.</li>
+<li><code>${VAR}</code> reads keys defined earlier in the file, or the real environment. An undefined reference is an <strong>error</strong>, not an empty string: silently expanding a password to nothing fails far from its cause.</li>
+<li>A bare <code>$</code> is left alone; only the braced form is a reference.</li>
+</ul>
+
+<h2>Two secrecy rules</h2>
+
+<div class="good">
+<b>Errors never quote values</b>
+<p>Parse failures name the key and the line number only. Exception messages travel into logs, error pages and bug reports.</p>
+</div>
+
+<div class="good">
+<b>Debug output is redacted</b>
+<p><code>Environment::__debugInfo()</code> returns key names and <code>&lt;redacted&gt;</code>. A <code>var_dump</code> in a stack trace cannot spill every credential the object holds.</p>
+</div>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$config</span> <span class="tk-p">=</span> <span class="tk-class">Environment</span>::<span class="tk-fn">fromArray</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;DB_PASSWORD&#039;</span> =&gt; <span class="tk-string">&#039;hunter2&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-fn">print_r</span><span class="tk-p">(</span><span class="tk-var">$config</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// PhpOrbit\Config\Environment Object</span>
+<span class="tk-comment">// (</span>
+<span class="tk-comment">//     [keys] =&gt; DB_PASSWORD</span>
+<span class="tk-comment">//     [values] =&gt; &lt;redacted&gt;</span>
+<span class="tk-comment">// )</span></code></pre></figure>
+
+<h2>Adding your own settings</h2>
+
+<p>Read them in <code>app/bootstrap.php</code> and pass concrete values into your services. Services should take what they need, not the whole <code>Environment</code>:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">singleton</span><span class="tk-p">(</span>
+    <span class="tk-class">Mailer</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span>
+    <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Mailer</span> =&gt; <span class="tk-keyword">new</span> <span class="tk-fn">Mailer</span><span class="tk-p">(</span>
+        host<span class="tk-p">:</span> <span class="tk-var">$env</span>-&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-string">&#039;MAIL_HOST&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        port<span class="tk-p">:</span> <span class="tk-var">$env</span>-&gt;<span class="tk-keyword">int</span><span class="tk-p">(</span><span class="tk-string">&#039;MAIL_PORT&#039;</span><span class="tk-p">,</span> <span class="tk-num">587</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        timeout<span class="tk-p">:</span> <span class="tk-var">$env</span>-&gt;<span class="tk-keyword">int</span><span class="tk-p">(</span><span class="tk-string">&#039;MAIL_TIMEOUT&#039;</span><span class="tk-p">,</span> <span class="tk-num">10</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>That way a missing setting fails at boot, and the service is testable without an environment at all.</p>
+
+<h2>Where .env lives</h2>
+
+<p>Beside <code>composer.json</code>, one level above <code>public/</code>, so it is unreachable even if a rewrite rule is misconfigured. <code>ServeStaticFiles</code> also refuses dotfiles outright — two independent protections.</p>
+    </article>
+    <nav class="pager"><a href="architecture.html"><span>Previous</span>Architecture</a><a class="next" href="routing.html"><span>Next</span>Routing</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

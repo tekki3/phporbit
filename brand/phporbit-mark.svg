@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="phporbit-mark-title">
+  <title id="phporbit-mark-title">phporbit</title>
+  <!--
+    Two crossed orbits, one core.
+
+    The rings are the framework's two process models — per-request (Apache,
+    nginx+FPM) and long-lived worker (the built-in server, FrankenPHP). The
+    core is the single application that runs unchanged in both. The rings pass
+    behind it because the application never has to know which one it is in.
+  -->
+  <defs>
+    <linearGradient id="phporbit-mark-grad" x1="6" y1="14" x2="58" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#58a6ff"/>
+      <stop offset="1" stop-color="#a371f7"/>
+    </linearGradient>
+  </defs>
+
+  <g fill="none" stroke="url(#phporbit-mark-grad)" stroke-width="3.25">
+    <ellipse cx="32" cy="32" rx="27" ry="11.5" transform="rotate(-28 32 32)"/>
+    <ellipse cx="32" cy="32" rx="27" ry="11.5" transform="rotate(28 32 32)"/>
+  </g>
+
+  <circle cx="32" cy="32" r="7.5" fill="url(#phporbit-mark-grad)"/>
+
+  <circle cx="55.84" cy="19.32" r="4.5" fill="#58a6ff"/>
+  <circle cx="8.16" cy="44.68" r="3" fill="#a371f7"/>
+</svg>

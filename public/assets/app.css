@@ -1,0 +1,398 @@
+/* phporbit demo application.
+   Shares its palette and spacing with docs/assets/docs.css so the application
+   and its documentation read as one system. Dark is the base; light is a full
+   token swap rather than an inversion. */
+
+:root {
+    --ground: #10131a;
+    --ground-2: #0c0f15;
+    --panel: #171b24;
+    --panel-2: #1e2431;
+    --line: #2a3140;
+    --line-strong: #3a4356;
+    --ink: #e6e9ef;
+    --muted: #98a2b8;
+    --accent: #58a6ff;
+    --violet: #a371f7;
+    --pass: #3fb950;
+    --fail: #f85149;
+    --warn: #d29922;
+
+    --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 8px 24px -12px rgb(0 0 0 / .5);
+    --glow: color-mix(in srgb, var(--accent) 14%, transparent);
+
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+    --width: 74rem;
+    --radius: 12px;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --ground: #fbfcfd;
+        --ground-2: #f2f4f8;
+        --panel: #ffffff;
+        --panel-2: #f4f6fa;
+        --line: #dee3ea;
+        --line-strong: #c4ccd8;
+        --ink: #1c2128;
+        --muted: #59636e;
+        --accent: #0969da;
+        --violet: #8250df;
+        --pass: #1a7f37;
+        --fail: #cf222e;
+        --warn: #9a6700;
+
+        --shadow: 0 1px 2px rgb(16 19 26 / .04), 0 8px 24px -14px rgb(16 19 26 / .18);
+    }
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 15px/1.65 var(--sans);
+    -webkit-font-smoothing: antialiased;
+}
+
+code, .check-detail, time, .tile-value { font-family: var(--mono); }
+
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+.skip {
+    position: absolute;
+    left: -9999px;
+    background: var(--accent);
+    color: #fff;
+    padding: .6rem 1rem;
+    z-index: 20;
+}
+.skip:focus { left: 0; }
+
+/* ------------------------------------------------------------------ masthead */
+
+.masthead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+    flex-wrap: wrap;
+    padding: .85rem clamp(1rem, 4vw, 2.5rem);
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--panel) 85%, transparent);
+    backdrop-filter: saturate(160%) blur(12px);
+}
+
+/* The lockup is the whole link: the wordmark is part of the artwork, so the
+   image's alt text is what names the site to a screen reader. */
+.brand { display: inline-flex; align-items: center; text-decoration: none; }
+/* 30px rather than 26: below that the mark's two crossed orbits merge into a
+   blob and stop reading as a mark at all. */
+.brand img { display: block; height: 30px; width: auto; }
+.brand:hover img { opacity: .82; }
+
+.masthead nav { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.masthead nav a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: .35rem .7rem;
+    border-radius: 7px;
+    font-size: .92rem;
+}
+.masthead nav a:hover { color: var(--ink); background: var(--panel-2); }
+.masthead nav a.current { color: var(--accent); background: var(--glow); font-weight: 600; }
+
+.masthead .who {
+    color: var(--ink);
+    font-weight: 600;
+    padding-left: .6rem;
+    margin-left: .3rem;
+    border-left: 1px solid var(--line);
+    font-size: .92rem;
+}
+form.inline { display: inline; }
+
+/* ----------------------------------------------------------------- structure */
+
+main { max-width: var(--width); margin: 0 auto; padding: 2.5rem clamp(1rem, 4vw, 2.5rem) 4rem; }
+
+/* Reading width for text-and-form pages. The self-check page opts out: its
+   tiles and check rows earn the full width, a login form does not. */
+.prose { max-width: 46rem; }
+.prose h1 { margin-bottom: .75rem; }
+.prose > p { color: var(--muted); }
+.prose > p:first-of-type { font-size: 1.02rem; }
+
+h1 { margin: 0; font-size: clamp(1.75rem, 3.5vw, 2.4rem); letter-spacing: -.025em; line-height: 1.15; text-wrap: balance; }
+h2 { margin: 0; font-size: 1.15rem; letter-spacing: -.01em; }
+h3 { margin: 0 0 .35rem; font-size: 1rem; }
+p { margin: 0 0 1rem; }
+p:last-child { margin-bottom: 0; }
+.muted { color: var(--muted); font-size: .9rem; }
+
+/* --------------------------------------------------------------------- hero */
+
+.hero {
+    position: relative;
+    overflow: hidden;
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background:
+        radial-gradient(120% 140% at 100% 0%, var(--glow), transparent 55%),
+        var(--panel);
+    box-shadow: var(--shadow);
+    margin-bottom: 1.25rem;
+}
+.hero-pass { border-left: 3px solid var(--pass); }
+.hero-fail { border-left: 3px solid var(--fail); }
+
+.eyebrow {
+    margin: 0 0 .5rem;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.hero-lede {
+    margin: .85rem 0 0;
+    max-width: 62ch;
+    color: var(--muted);
+    font-size: 1.02rem;
+    text-wrap: pretty;
+}
+
+/* <progress> needs its native appearance removed before it can be styled, and
+   the bar and value are separate pseudo-elements per engine. The rules cannot
+   be combined into one selector list: an engine that does not recognise one
+   selector discards the whole rule. */
+.meter {
+    display: block;
+    width: 100%;
+    height: 5px;
+    margin-top: 1.5rem;
+    appearance: none;
+    border: 0;
+    border-radius: 99px;
+    background: var(--panel-2);
+    overflow: hidden;
+    color: var(--pass);
+}
+.hero-fail .meter { color: var(--fail); }
+
+.meter::-webkit-progress-bar { background: var(--panel-2); border-radius: 99px; }
+.meter::-webkit-progress-value { background: currentColor; border-radius: 99px; }
+.meter::-moz-progress-bar { background: currentColor; border-radius: 99px; }
+
+/* -------------------------------------------------------------------- tiles */
+
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: .85rem;
+    margin-bottom: 2.5rem;
+}
+
+.tile {
+    display: grid;
+    gap: .2rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+}
+.tile-accent { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: linear-gradient(var(--glow), transparent), var(--panel); }
+
+.tile-label { font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.tile-value { font-size: 1.75rem; font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
+.tile-value-text { font-size: 1.15rem; }
+.tile-unit { font-size: .95rem; color: var(--muted); margin-left: .1em; }
+.tile-note { font-size: .78rem; color: var(--muted); }
+
+/* ------------------------------------------------------------------- groups */
+
+.group { margin-bottom: 2rem; }
+.group-title {
+    margin-bottom: .7rem;
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.checks {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--panel);
+}
+
+.check {
+    display: grid;
+    grid-template-columns: 4.75rem 14rem minmax(0, 1fr);
+    gap: 1rem;
+    align-items: baseline;
+    padding: .8rem 1.1rem;
+    border-bottom: 1px solid var(--line);
+}
+.check:last-child { border-bottom: 0; }
+.check:hover { background: var(--panel-2); }
+.check-fail { background: color-mix(in srgb, var(--fail) 8%, transparent); }
+
+.check-name { font-weight: 600; }
+.check-detail { color: var(--muted); font-size: .84rem; overflow-wrap: anywhere; }
+
+/* Pass and fail are distinguished by their label, not by colour alone. */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .12rem .5rem;
+    border-radius: 99px;
+    font-family: var(--mono);
+    font-size: .66rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    border: 1px solid;
+}
+.chip-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.check-pass .chip { color: var(--pass); border-color: color-mix(in srgb, var(--pass) 35%, transparent); background: color-mix(in srgb, var(--pass) 12%, transparent); }
+.check-fail .chip { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 35%, transparent); background: color-mix(in srgb, var(--fail) 12%, transparent); }
+
+/* -------------------------------------------------------------------- cards */
+
+.card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.25rem;
+}
+.card + .card { margin-top: .85rem; }
+.card code { color: var(--ink); background: var(--panel-2); padding: .12rem .4rem; border-radius: 5px; border: 1px solid var(--line); font-size: .86em; }
+
+.note { color: var(--muted); font-size: .9rem; margin-top: 1.25rem; }
+.note code { color: var(--ink); background: var(--panel-2); padding: .12rem .35rem; border-radius: 4px; }
+
+.facts { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.facts th, .facts td { text-align: left; padding: .65rem 1rem; border-bottom: 1px solid var(--line); background: var(--panel); }
+.facts tr:last-child th, .facts tr:last-child td { border-bottom: 0; }
+.facts th { font-weight: 600; color: var(--muted); width: 60%; }
+
+/* -------------------------------------------------------------------- forms */
+
+form.card { display: grid; gap: .9rem; }
+label { display: grid; gap: .35rem; font-size: .82rem; color: var(--muted); font-weight: 600; }
+
+input[type=text], input[type=email], input[type=password],
+input[type=tel], input[type=url], input[type=number], input[type=date],
+select, textarea {
+    width: 100%;
+    padding: .6rem .75rem;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--ground-2);
+    color: var(--ink);
+    font: inherit;
+}
+input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+input[type=file] { color: var(--muted); font: inherit; font-size: .9rem; }
+textarea { min-height: 6rem; resize: vertical; }
+
+button {
+    justify-self: start;
+    padding: .55rem 1.15rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+button:hover { filter: brightness(1.08); }
+button.link {
+    border: 0;
+    background: none;
+    padding: 0;
+    color: var(--muted);
+    font-weight: 500;
+    font-size: .92rem;
+}
+button.link:hover { color: var(--fail); filter: none; }
+
+.error {
+    padding: .7rem .9rem;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--fail) 40%, transparent);
+    background: color-mix(in srgb, var(--fail) 10%, transparent);
+    color: var(--fail);
+    font-size: .9rem;
+}
+.notice {
+    padding: .7rem .9rem;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--pass) 40%, transparent);
+    background: color-mix(in srgb, var(--pass) 10%, transparent);
+    color: var(--pass);
+    font-size: .9rem;
+}
+
+/* -------------------------------------------------------------------- notes */
+
+.notes { list-style: none; padding: 0; margin: 1.5rem 0 0; display: grid; gap: .85rem; }
+.notes p { margin: 0 0 .6rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.notes footer { display: flex; justify-content: space-between; align-items: center; gap: 1rem; border: 0; padding: 0; margin: 0; max-width: none; }
+.notes time { color: var(--muted); font-size: .78rem; }
+
+.avatar { width: 96px; height: 96px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--line); }
+.signin-mark { display: block; width: 56px; height: 56px; margin-bottom: 1.25rem; }
+
+/* ------------------------------------------------------------------- footer */
+
+.site-footer {
+    max-width: var(--width);
+    margin: 0 auto;
+    padding: 1.5rem clamp(1rem, 4vw, 2.5rem) 3rem;
+    color: var(--muted);
+    font-size: .85rem;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.site-footer a { color: var(--muted); }
+.site-footer a:hover { color: var(--accent); }
+
+/* ------------------------------------------------------------ narrow screens */
+
+@media (max-width: 46rem) {
+    .check { grid-template-columns: 4.75rem minmax(0, 1fr); row-gap: .35rem; }
+    .check-detail { grid-column: 2; }
+    .masthead { position: static; }
+}
+
+/* Generated forms (PhpOrbit\Form). The label carries its own inline marker, so
+   it must not become a grid container the way a bare label does above. */
+.field { display: grid; gap: .35rem; margin: 0 0 1.1rem; }
+.field label { display: block; }
+.field .hint { color: var(--muted); font-size: .82rem; }
+.field .error { color: var(--fail); font-size: .85rem; font-weight: 500; }
+.field [aria-invalid="true"] { border-color: var(--fail); }

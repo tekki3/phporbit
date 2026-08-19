@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security — phporbit</title>
+<meta name="description" content="Context-aware escaping, CSRF, security headers, and the attacks the framework handles before your code runs.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html" class="current" aria-current="page">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Security</h1>
+        <p class="summary">Context-aware escaping, CSRF, security headers, and the attacks the framework handles before your code runs.</p>
+        <p>The rule throughout: <strong>the safe path is the default path</strong>. You do not opt into safety; you opt out of it, visibly.</p>
+
+<h2>Escaping</h2>
+
+<p>There is no single &ldquo;escape&rdquo; function that is correct everywhere. A value safe inside an HTML element is still dangerous in an unquoted attribute, a script block or a URL — so each context has its own method.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Security\Escaper</span><span class="tk-p">;</span>
+
+<span class="tk-class">Escaper</span>::<span class="tk-fn">html</span><span class="tk-p">(</span><span class="tk-var">$value</span><span class="tk-p">)</span><span class="tk-p">;</span>           <span class="tk-comment">// text inside an element</span>
+<span class="tk-class">Escaper</span>::<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-var">$value</span><span class="tk-p">)</span><span class="tk-p">;</span>      <span class="tk-comment">// an attribute value</span>
+<span class="tk-class">Escaper</span>::<span class="tk-fn">js</span><span class="tk-p">(</span><span class="tk-var">$value</span><span class="tk-p">)</span><span class="tk-p">;</span>             <span class="tk-comment">// a string literal in &lt;script&gt; — includes quotes</span>
+<span class="tk-class">Escaper</span>::<span class="tk-fn">url</span><span class="tk-p">(</span><span class="tk-var">$value</span><span class="tk-p">)</span><span class="tk-p">;</span>            <span class="tk-comment">// one query parameter or path segment</span>
+<span class="tk-class">Escaper</span>::<span class="tk-fn">urlAttribute</span><span class="tk-p">(</span><span class="tk-var">$url</span><span class="tk-p">)</span><span class="tk-p">;</span>     <span class="tk-comment">// a whole URL for href/src</span></code></pre></figure>
+
+<p>In templates, <code>{{ }}</code> calls <code>html()</code> for you. The others are explicit:</p>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>&lt;p&gt;{{ $name }}&lt;/p&gt;
+
+&lt;button data-user=&quot;{!! Escaper::attribute($name) !!}&quot;&gt;Save&lt;/button&gt;
+
+&lt;a href=&quot;{!! Escaper::urlAttribute($link) !!}&quot;&gt;Open&lt;/a&gt;
+
+&lt;script&gt;
+    const user = {!! Escaper::js($name) !!};
+&lt;/script&gt;</code></pre></figure>
+
+<h3>Why attribute() is so aggressive</h3>
+
+<p>It hex-encodes every character outside <code>[a-zA-Z0-9,._-]</code>, which stays safe even when the template author forgot the quotes:</p>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>{# Both are safe, which is the point #}
+&lt;div title={!! Escaper::attribute($value) !!}&gt;
+&lt;div title=&quot;{!! Escaper::attribute($value) !!}&quot;&gt;</code></pre></figure>
+
+<h3>js() brings its own quotes</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-class">Escaper</span>::<span class="tk-fn">js</span><span class="tk-p">(</span><span class="tk-string">&#039;hello &quot;world&quot;&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// &quot;hello &quot;world&quot;&quot;</span>
+
+<span class="tk-comment">// WRONG — you end up with doubled quotes</span>
+<span class="tk-comment">// &lt;script&gt;const x = &quot;{!! Escaper::js($v) !!}&quot;;&lt;/script&gt;</span>
+
+<span class="tk-comment">// RIGHT</span>
+<span class="tk-comment">// &lt;script&gt;const x = {!! Escaper::js($v) !!};&lt;/script&gt;</span></code></pre></figure>
+
+<p>It encodes as JSON, including the surrounding quotes, because manual backslash escaping reliably misses a case.</p>
+
+<h3>urlAttribute() neutralises dangerous schemes</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-class">Escaper</span>::<span class="tk-fn">urlAttribute</span><span class="tk-p">(</span><span class="tk-string">&#039;https://example.test/page&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// escaped, allowed</span>
+<span class="tk-class">Escaper</span>::<span class="tk-fn">urlAttribute</span><span class="tk-p">(</span><span class="tk-string">&#039;/local/path&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>                 <span class="tk-comment">// relative, allowed</span>
+<span class="tk-class">Escaper</span>::<span class="tk-fn">urlAttribute</span><span class="tk-p">(</span><span class="tk-string">&#039;mailto:a@example.test&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>       <span class="tk-comment">// allowed</span>
+
+<span class="tk-class">Escaper</span>::<span class="tk-fn">urlAttribute</span><span class="tk-p">(</span><span class="tk-string">&#039;javascript:alert(1)&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>         <span class="tk-comment">// &quot;#&quot;</span>
+<span class="tk-class">Escaper</span>::<span class="tk-fn">urlAttribute</span><span class="tk-p">(</span><span class="tk-string">&#039;data:text/html,&lt;script&gt;…&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// &quot;#&quot;</span>
+<span class="tk-class">Escaper</span>::<span class="tk-fn">urlAttribute</span><span class="tk-p">(</span><span class="tk-string">&#039;  javascript:alert(1)&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>       <span class="tk-comment">// &quot;#&quot; — leading space too</span></code></pre></figure>
+
+<p>Only <code>http</code>, <code>https</code> and <code>mailto</code> survive. Returning a harmless value rather than throwing keeps one hostile link from taking down a whole page render.</p>
+
+<h2>CSRF</h2>
+
+<p>Protection is on for every state-changing method. A form needs the token:</p>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>&lt;form method=&quot;post&quot; action=&quot;/articles&quot;&gt;
+    &lt;input type=&quot;hidden&quot; name=&quot;_token&quot; value=&quot;{{ $csrfToken }}&quot;&gt;
+    &lt;input name=&quot;title&quot;&gt;
+    &lt;button type=&quot;submit&quot;&gt;Publish&lt;/button&gt;
+&lt;/form&gt;</code></pre></figure>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Security\Csrf</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// In a controller</span>
+<span class="tk-var">$token</span> <span class="tk-p">=</span> <span class="tk-class">Csrf</span>::<span class="tk-fn">token</span><span class="tk-p">(</span><span class="tk-var">$session</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Or a ready-made input</span>
+<span class="tk-var">$field</span> <span class="tk-p">=</span> <span class="tk-class">Csrf</span>::<span class="tk-fn">field</span><span class="tk-p">(</span><span class="tk-var">$session</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// &lt;input type=&quot;hidden&quot; name=&quot;_token&quot; value=&quot;…&quot;&gt;</span></code></pre></figure>
+
+<p>For fetch/XHR, send it as a header instead:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// X-CSRF-Token: &lt;token&gt;</span></code></pre></figure>
+
+<h3>Opting a route out</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// A webhook authenticates by signature, not by session — there is no token to send.</span>
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">add</span><span class="tk-p">(</span><span class="tk-class">Method</span>::<span class="tk-class">Post</span><span class="tk-p">,</span> <span class="tk-string">&#039;/webhooks/stripe&#039;</span><span class="tk-p">,</span> <span class="tk-class">StripeWebhook</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;webhooks.stripe&#039;</span><span class="tk-p">,</span> csrfExempt<span class="tk-p">:</span> <span class="tk-keyword">true</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Per route, and explicit. Verify the signature in the handler.</p>
+
+<h3>How it works</h3>
+
+<ul>
+<li>The token is 256 bits from the CSPRNG, stored in the session, minted on first use.</li>
+<li>It is bound to the session rather than one form, so several open tabs do not invalidate each other.</li>
+<li>Comparison uses <code>hash_equals</code> — <code>===</code> would leak the correct prefix through timing.</li>
+<li>Safe methods (GET, HEAD, OPTIONS) skip the check entirely.</li>
+<li><code>Csrf::rotate()</code> discards the token; the authenticator calls it on login.</li>
+</ul>
+
+<p>A missing or wrong token gives <code>403 CSRF token missing or invalid.</code></p>
+
+<h2>Security headers</h2>
+
+<p>Applied to every response, including error pages:</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src &#039;self&#039;; frame-ancestors &#039;none&#039;; base-uri &#039;self&#039;</code></pre></figure>
+
+<p>They live in <code>Response</code> rather than middleware so a response built on the error path still carries them. <a href="responses.html">Overriding them &rarr;</a></p>
+
+<h2>Handled before your code runs</h2>
+
+<h3>Path traversal</h3>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>curl -i &#039;http://127.0.0.1:8080/files/../../etc/passwd&#039;
+HTTP/1.1 400 Bad Request
+
+<span class="tk-p">$ </span>curl -i &#039;http://127.0.0.1:8080/files/%2E%2E%2F%2E%2E%2Fetc&#039;
+HTTP/1.1 400 Bad Request</code></pre></figure>
+
+<p><code>Uri</code> splits on <code>/</code> <em>before</em> decoding, so an encoded separator cannot create a segment, and matches dot segments <em>after</em> decoding, so <code>%2E%2E</code> is caught. Encoded separators are rejected; a path climbing above the root is refused rather than clamped.</p>
+
+<h3>Header and response splitting</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-class">Headers</span>::<span class="tk-keyword">empty</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">with</span><span class="tk-p">(</span><span class="tk-string">&#039;X-Note&#039;</span><span class="tk-p">,</span> <span class="tk-string">&quot;one\r\nX-Injected: yes&quot;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// MalformedRequest: Header values may not contain CR, LF or NUL.</span></code></pre></figure>
+
+<p>Rejected, not stripped. Same for cookie values, which additionally refuse spaces, quotes, commas, semicolons and backslashes.</p>
+
+<h3>Request flooding</h3>
+
+<p><code>RequestParser</code> bounds every read: request line, header count, total header bytes, body size. An HTTP parser without limits is a memory-exhaustion primitive — a client that opens a connection and streams header bytes forever would otherwise consume the whole process.</p>
+
+<h3>Host header poisoning</h3>
+
+<p><code>FpmSapi</code> prefers <code>SERVER_NAME</code> (your web server's configuration) over the client-supplied <code>Host</code>, so a forged Host cannot poison generated URLs or password-reset links. <code>X-Forwarded-Proto</code> is believed only from a configured trusted proxy:</p>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-var">TRUSTED_PROXIES</span><span class="tk-p">=</span><span class="tk-string">10.0.0.1,10.0.0.2</span></code></pre></figure>
+
+<p>Believing it unconditionally would let anyone claim their plaintext request was HTTPS and unlock Secure-only cookies.</p>
+
+<h2>Errors keep their secrets</h2>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code># production
+Internal Server Error
+
+# --debug
+RuntimeException: SQLSTATE[HY000] … user=admin password=hunter2
+  in /srv/app/src/Database/Connection.php:142</code></pre></figure>
+
+<p>Exception messages carry paths, SQL and credentials, so detail is opt-in. The same applies to configuration: parse errors name the key and line but never the value, and <code>Environment::__debugInfo()</code> redacts everything.</p>
+
+<h2>A checklist for your own code</h2>
+
+<ul>
+<li>Use <code>{{ }}</code>. Reach for <code>{!! !!}</code> only for markup <em>you</em> built.</li>
+<li>Never build SQL by interpolation — there is no API that accepts it, so this is mostly about hand-written strings.</li>
+<li>Map user input to identifiers through an allowlist before <code>orderBy()</code>.</li>
+<li>Judge uploads by <code>detectedType()</code>, never by filename or declared type.</li>
+<li>Call <code>$auth->login()</code> rather than writing the user id into the session yourself — it regenerates the session id and rotates the CSRF token.</li>
+<li>Put <code>required()</code> on secrets in configuration, so a blank value fails at boot.</li>
+</ul>
+    </article>
+    <nav class="pager"><a href="migrations.html"><span>Previous</span>Migrations</a><a class="next" href="sessions.html"><span>Next</span>Sessions</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

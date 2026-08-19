@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="phporbit-favicon-title">
+  <title id="phporbit-favicon-title">phporbit</title>
+  <!--
+    Favicon build of the mark, simplified for 16px.
+
+    One ring instead of two and a heavier stroke: at tab size the second ring
+    turns the centre into a smudge, and hairlines disappear entirely. The
+    satellite is kept because it is what stops the shape reading as a plain
+    circle among a row of other tabs.
+  -->
+  <defs>
+    <linearGradient id="phporbit-favicon-grad" x1="6" y1="14" x2="58" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#58a6ff"/>
+      <stop offset="1" stop-color="#a371f7"/>
+    </linearGradient>
+  </defs>
+
+  <ellipse cx="32" cy="32" rx="26" ry="12.5" transform="rotate(-28 32 32)"
+           fill="none" stroke="url(#phporbit-favicon-grad)" stroke-width="5.5"/>
+
+  <circle cx="32" cy="32" r="9.5" fill="url(#phporbit-favicon-grad)"/>
+
+  <circle cx="54.95" cy="21.15" r="6" fill="#58a6ff"/>
+</svg>

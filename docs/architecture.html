@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture — phporbit</title>
+<meta name="description" content="The two process models, the boot/request split that follows from them, and the request lifecycle.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html" class="current" aria-current="page">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Architecture</h1>
+        <p class="summary">The two process models, the boot/request split that follows from them, and the request lifecycle.</p>
+        <p>Almost every design decision in phporbit follows from one fact. It is worth ten minutes.</p>
+
+<h2>Two incompatible process models</h2>
+
+<p>The four deployment targets are really two:</p>
+
+<ul>
+<li><strong>Per-request.</strong> Apache and nginx+FPM start a process, serve one request, and tear it down. Global state is free — a leak has nothing to leak into, because nothing survives.</li>
+<li><strong>Long-lived worker.</strong> The built-in server and FrankenPHP boot once and serve thousands of requests in the same process. Anything mutable that outlives a request is visible to <em>the next user</em>.</li>
+</ul>
+
+<p>A cached authenticated user, a request-scoped binding left in the container, a static property, an open transaction — under FPM these are invisible. Under a worker they are a security bug.</p>
+
+<div class="note">
+<b>The rule</b>
+<p>Worker-safe code is automatically correct on per-request SAPIs. The reverse is false. So <strong>assume the worker model everywhere</strong>, and treat worker safety as a correctness invariant rather than a deployment concern.</p>
+</div>
+
+<h2>The boot / request split</h2>
+
+<p>phporbit separates the two phases by construction, not by convention.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Kernel\Application</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Kernel\Blueprint</span><span class="tk-p">;</span>
+
+<span class="tk-var">$app</span> <span class="tk-p">=</span> <span class="tk-class">Application</span>::<span class="tk-fn">boot</span><span class="tk-p">(</span><span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-p">(</span><span class="tk-class">Blueprint</span> <span class="tk-var">$app</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span> <span class="tk-p">{</span>
+    <span class="tk-comment">// BOOT PHASE — runs once per process.</span>
+    <span class="tk-comment">// Register services, middleware and routes here.</span>
+    <span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">singleton</span><span class="tk-p">(</span><span class="tk-class">Clock</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Clock</span> =&gt; <span class="tk-keyword">new</span> <span class="tk-fn">SystemClock</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-var">$app</span>-&gt;<span class="tk-fn">loadRoutes</span><span class="tk-p">(</span>__DIR__ <span class="tk-p">.</span> <span class="tk-string">&#039;/routes.php&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// The moment boot() returns:</span>
+<span class="tk-comment">//   * the route table is compiled</span>
+<span class="tk-comment">//   * the container is frozen</span>
+<span class="tk-comment">//   * every property of $app is readonly</span>
+<span class="tk-comment">//</span>
+<span class="tk-comment">// There is nothing mutable left to accumulate into.</span>
+
+<span class="tk-var">$response</span> <span class="tk-p">=</span> <span class="tk-var">$app</span>-&gt;<span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// REQUEST PHASE — runs many times</span></code></pre></figure>
+
+<p>Try to register a service after boot and you get an exception, not a subtle bug:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$app</span>-&gt;<span class="tk-fn">container</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">singleton</span><span class="tk-p">(</span><span class="tk-class">Clock</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-var">$factory</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// PhpOrbit\Container\Exception\ContainerFrozen:</span>
+<span class="tk-comment">//   Cannot register &quot;Clock&quot;: the container was frozen when the application</span>
+<span class="tk-comment">//   finished booting. Registering during a request would leak the definition</span>
+<span class="tk-comment">//   into every later request served by this worker process.</span></code></pre></figure>
+
+<h2>How each leak is closed</h2>
+
+<div class="scroller">
+<table>
+<thead><tr><th>Leak</th><th>What stops it</th></tr></thead>
+<tbody>
+<tr><td>Service registered mid-request</td><td><code>Container::freeze()</code> throws after boot</td></tr>
+<tr><td>Per-request object cached process-wide</td><td>Autowiring lives only on <code>RequestScope</code>, never on <code>Container</code></td></tr>
+<tr><td>Scope held past its request</td><td><code>RequestScope::close()</code> makes later use throw <code>ScopeClosed</code></td></tr>
+<tr><td>Resource never released</td><td>The scope closes in a <code>finally</code>, so it runs on the error path too</td></tr>
+<tr><td>Transaction left open on a shared connection</td><td><code>TransactionGuard</code> rolls it back and logs</td></tr>
+<tr><td>Upload temp files piling up</td><td>The kernel discards them when the scope closes</td></tr>
+<tr><td>One user's session reaching another</td><td>Sessions are per-request objects, not <code>$_SESSION</code></td></tr>
+<tr><td>Render state shared between pages</td><td><code>TemplateEngine</code> is config only; a <code>Renderer</code> is created per render</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>Three service lifetimes</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// Once per process. Shared by every request. Must be stateless.</span>
+<span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">singleton</span><span class="tk-p">(</span><span class="tk-class">Connection</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Connection</span> =&gt; <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Once per request. Disposed when the request ends.</span>
+<span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">scoped</span><span class="tk-p">(</span><span class="tk-class">Cart</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-class">RequestScope</span> <span class="tk-var">$scope</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Cart</span> =&gt; <span class="tk-keyword">new</span> <span class="tk-fn">Cart</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Not registered at all: autowired per request from the constructor signature.</span>
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">ReportController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">,</span>   <span class="tk-comment">// the singleton</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Session</span> <span class="tk-var">$session</span><span class="tk-p">,</span>       <span class="tk-comment">// published by middleware</span>
+    <span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<div class="warn">
+<b>Why autowiring is scope-only</b>
+<p>If the container cached an autowired instance, that instance would be shared by every later request in a worker. So <code>Container::get()</code> still refuses anything unregistered; only <code>RequestScope::get()</code> will build it, and what it builds dies with the request.</p>
+</div>
+
+<h2>The request lifecycle</h2>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>enterRequest()                        a fresh RequestScope is opened
+  │
+  ├─ provide(RequestScope)            so handlers can inject the scope
+  ├─ schedule upload cleanup          runs even if something throws
+  │
+  ├─ router-&gt;match(request)           routing happens BEFORE middleware
+  │    └─ provide(Route)              so middleware can see which route matched
+  │
+  ├─ global middleware  ─────────┐    outermost first
+  │    route middleware ─────┐   │
+  │      handler            ─┘   │
+  │    ◄──────────────────────────    response travels back out
+  │
+  └─ finally: scope-&gt;close()          teardown, always</code></pre></figure>
+
+<p>Routing before the pipeline is a deliberate choice. It means a middleware can read the matched route — that is how CSRF honours a route's exemption — while still running for requests that matched nothing, so logging and auditing see 404s.</p>
+
+<h2>Where environment-specific code is allowed</h2>
+
+<p>Only in <code>src/Sapi/</code> and the entrypoints (<code>orbit</code>, <code>public/index.php</code>). Above that boundary the request object is identical on all four targets.</p>
+
+<p>That includes CLI-only constants:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// WRONG — STDERR is defined only under the CLI SAPI. This is a fatal error at</span>
+<span class="tk-comment">// boot under FPM, Apache and php -S.</span>
+<span class="tk-var">$logger</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-fn">StreamLogger</span><span class="tk-p">(</span><span class="tk-class">STDERR</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// RIGHT — the php://stderr wrapper exists on every SAPI, and lands in the</span>
+<span class="tk-comment">// terminal under CLI, the pool log under FPM, the server log under Apache.</span>
+<span class="tk-var">$logger</span> <span class="tk-p">=</span> <span class="tk-class">StreamLogger</span>::<span class="tk-fn">standardError</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<div class="note">
+<b>This is enforced, not just documented</b>
+<p><code>tests/Unit/PortabilityTest.php</code> tokenises the whole source tree and fails the build on CLI-only constants, superglobals outside the SAPI boundary, and any use of PHP's session extension. It tokenises rather than pattern-matches so the prose explaining a rule does not itself trip it. The test suite runs under the CLI, so nothing else would catch this class of bug.</p>
+</div>
+
+<h2>Testing the invariant</h2>
+
+<p>State-leak bugs are invisible under per-request execution, so they get their own suite. Every test in <code>tests/Worker/</code> boots once and handles at least twice:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">test_a_scoped_service_starts_fresh_for_each_request</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+<span class="tk-p">{</span>
+    <span class="tk-var">$app</span> <span class="tk-p">=</span> <span class="tk-class">Application</span>::<span class="tk-fn">boot</span><span class="tk-p">(</span><span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-p">(</span><span class="tk-class">Blueprint</span> <span class="tk-var">$app</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span> <span class="tk-p">{</span>
+        <span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">scoped</span><span class="tk-p">(</span><span class="tk-class">Counter</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Counter</span> =&gt; <span class="tk-keyword">new</span> <span class="tk-fn">Counter</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-var">$app</span>-&gt;routes-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/count&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$r</span><span class="tk-p">,</span> <span class="tk-class">RequestScope</span> <span class="tk-var">$scope</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span> =&gt;
+            <span class="tk-class">Response</span>::<span class="tk-fn">text</span><span class="tk-p">(</span>(string) <span class="tk-var">$scope</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-class">Counter</span>::<span class="tk-keyword">class</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">increment</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-comment">// If the scope leaked, the second call would return &quot;2&quot;.</span>
+    <span class="tk-keyword">self</span>::<span class="tk-fn">assertSame</span><span class="tk-p">(</span><span class="tk-string">&#039;1&#039;</span><span class="tk-p">,</span> <span class="tk-var">$app</span>-&gt;<span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">Requests</span>::<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/count&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span>-&gt;body<span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-keyword">self</span>::<span class="tk-fn">assertSame</span><span class="tk-p">(</span><span class="tk-string">&#039;1&#039;</span><span class="tk-p">,</span> <span class="tk-var">$app</span>-&gt;<span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">Requests</span>::<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/count&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span>-&gt;body<span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p>When you add framework-level behaviour, test it under both process models. <a href="testing.html">More on testing &rarr;</a></p>
+    </article>
+    <nav class="pager"><a href="getting-started.html"><span>Previous</span>Getting started</a><a class="next" href="configuration.html"><span>Next</span>Configuration</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Routing — phporbit</title>
+<meta name="description" content="Declaring routes, capturing parameters, grouping, naming, and generating URLs.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html" class="current" aria-current="page">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Routing</h1>
+        <p class="summary">Declaring routes, capturing parameters, grouping, naming, and generating URLs.</p>
+        <p>Routes live in <code>app/routes.php</code>, which returns a closure. The file is loaded during the boot phase, so routes still land before the table is compiled — living in their own file changes <em>where</em> they are written, not <em>when</em> they take effect.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// app/routes.php</span>
+<span class="tk-keyword">use</span> <span class="tk-class">App\Controllers\HomeController</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Routing\RouteCollection</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">return</span> <span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-p">(</span><span class="tk-class">RouteCollection</span> <span class="tk-var">$routes</span><span class="tk-p">,</span> <span class="tk-keyword">bool</span> <span class="tk-var">$debug</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span> <span class="tk-p">{</span>
+    <span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/&#039;</span><span class="tk-p">,</span> <span class="tk-class">HomeController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;home&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span><span class="tk-p">;</span></code></pre></figure>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// app/bootstrap.php — inside the boot callback</span>
+<span class="tk-var">$app</span>-&gt;<span class="tk-fn">loadRoutes</span><span class="tk-p">(</span><span class="tk-var">$root</span> <span class="tk-p">.</span> <span class="tk-string">&#039;/app/routes.php&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Methods</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles&#039;</span><span class="tk-p">,</span> <span class="tk-class">IndexController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;articles.index&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">post</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles&#039;</span><span class="tk-p">,</span> <span class="tk-class">StoreController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;articles.store&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">put</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles/{id}&#039;</span><span class="tk-p">,</span> <span class="tk-class">ReplaceController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;articles.replace&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">patch</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles/{id}&#039;</span><span class="tk-p">,</span> <span class="tk-class">UpdateController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;articles.update&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">delete</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles/{id}&#039;</span><span class="tk-p">,</span> <span class="tk-class">DeleteController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;articles.delete&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p><code>HEAD</code> is served automatically by the matching <code>GET</code> route; the kernel strips the body and leaves the headers identical. For anything else, use <code>add()</code>:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Method</span><span class="tk-p">;</span>
+
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">add</span><span class="tk-p">(</span><span class="tk-class">Method</span>::<span class="tk-class">Post</span><span class="tk-p">,</span> <span class="tk-string">&#039;/webhooks/stripe&#039;</span><span class="tk-p">,</span> <span class="tk-class">StripeWebhook</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;webhooks.stripe&#039;</span><span class="tk-p">,</span> csrfExempt<span class="tk-p">:</span> <span class="tk-keyword">true</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Handlers</h2>
+
+<p>A route points at either a controller class or a closure.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// A class implementing Handler. Constructor dependencies are autowired.</span>
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles&#039;</span><span class="tk-p">,</span> <span class="tk-class">IndexController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;articles.index&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// A closure, for things too small to deserve a file.</span>
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/ping&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span> =&gt; <span class="tk-class">Response</span>::<span class="tk-fn">json</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;pong&#039;</span> =&gt; <span class="tk-keyword">true</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// A closure receives the request and the request scope.</span>
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/whoami&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">,</span> <span class="tk-class">RequestScope</span> <span class="tk-var">$scope</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span> =&gt;
+    <span class="tk-class">Response</span>::<span class="tk-fn">text</span><span class="tk-p">(</span><span class="tk-var">$scope</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-class">Session</span>::<span class="tk-keyword">class</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;name&#039;</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;guest&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p><a href="controllers.html">More on controllers &rarr;</a></p>
+
+<h2>Parameters</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/users/{id}&#039;</span><span class="tk-p">,</span> <span class="tk-class">ShowUser</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;users.show&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/users/{id}/posts/{slug}&#039;</span><span class="tk-p">,</span> <span class="tk-class">ShowPost</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;posts.show&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Captured values arrive as request attributes:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+<span class="tk-p">{</span>
+    <span class="tk-var">$id</span> <span class="tk-p">=</span> <span class="tk-var">$request</span>-&gt;<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>        <span class="tk-comment">// string|null</span>
+    <span class="tk-var">$slug</span> <span class="tk-p">=</span> <span class="tk-var">$request</span>-&gt;<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-string">&#039;slug&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">text</span><span class="tk-p">(</span><span class="tk-p">&quot;</span>{<span class="tk-var">$id</span><span class="tk-p">}</span><span class="tk-string"> / </span>{<span class="tk-var">$slug</span><span class="tk-p">}</span><span class="tk-p">&quot;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<div class="note">
+<b>A parameter never spans path segments</b>
+<p>An unconstrained <code>{name}</code> matches <code>[^/]+</code>. <code>/files/{name}</code> will not match <code>/files/a/b</code>. Placeholders that quietly swallow slashes are a common source of routes matching far more than their author intended.</p>
+</div>
+
+<h3>Constraints</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/orders/{id:\d+}&#039;</span><span class="tk-p">,</span> <span class="tk-class">ShowOrder</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;orders.show&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/posts/{slug:[a-z0-9-]+}&#039;</span><span class="tk-p">,</span> <span class="tk-class">ShowPost</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;posts.show&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/reports/{year:\d{4}}/{month:\d{2}}&#039;</span><span class="tk-p">,</span> <span class="tk-class">Report</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;reports.show&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>The constraint is a regular expression spliced into the compiled pattern. A broken one fails at <strong>boot</strong>, not on the first request that happens to reach the route:</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>PhpOrbit\Routing\Exception\InvalidRoutePattern:
+  Route pattern &quot;/orders/{id:[0-9}&quot; compiles to an invalid regex; check its constraints.</code></pre></figure>
+
+<h2>Grouping</h2>
+
+<h3>By path prefix</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">group</span><span class="tk-p">(</span><span class="tk-string">&#039;/api/v1&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-p">(</span><span class="tk-class">RouteCollection</span> <span class="tk-var">$routes</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span> <span class="tk-p">{</span>
+    <span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/users&#039;</span><span class="tk-p">,</span> <span class="tk-class">ApiUsers</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;api.users&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>       <span class="tk-comment">// /api/v1/users</span>
+    <span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/orders&#039;</span><span class="tk-p">,</span> <span class="tk-class">ApiOrders</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;api.orders&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// /api/v1/orders</span>
+<span class="tk-p">}</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Groups nest, and the prefix is restored in a <code>finally</code> — a throwing callback cannot leak its prefix onto routes declared afterwards.</p>
+
+<h3>By middleware</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Auth\RequireAuthentication</span><span class="tk-p">;</span>
+
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">withMiddleware</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-keyword">new</span> <span class="tk-fn">RequireAuthentication</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">]</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-p">(</span><span class="tk-class">RouteCollection</span> <span class="tk-var">$routes</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span> <span class="tk-p">{</span>
+    <span class="tk-var">$routes</span>-&gt;<span class="tk-fn">post</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles&#039;</span><span class="tk-p">,</span> <span class="tk-class">StoreController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;articles.store&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-var">$routes</span>-&gt;<span class="tk-fn">post</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles/{id:\d+}/delete&#039;</span><span class="tk-p">,</span> <span class="tk-class">DeleteController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;articles.delete&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<div class="good">
+<b>State a guard once</b>
+<p><code>withMiddleware()</code> is a prefix-less <code>group()</code> with its own name, because &ldquo;these require a signed-in user&rdquo; and &ldquo;these live under /admin&rdquo; are different statements. Prefer it to repeating the guard per line — a guard repeated on every line is one that eventually gets left off one of them.</p>
+</div>
+
+<p>Both can be combined:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">group</span><span class="tk-p">(</span><span class="tk-string">&#039;/admin&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-p">(</span><span class="tk-class">RouteCollection</span> <span class="tk-var">$routes</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span> <span class="tk-p">{</span>
+    <span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/&#039;</span><span class="tk-p">,</span> <span class="tk-class">Dashboard</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;admin.home&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/users&#039;</span><span class="tk-p">,</span> <span class="tk-class">AdminUsers</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;admin.users&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-keyword">new</span> <span class="tk-fn">RequireAuthentication</span><span class="tk-p">(</span><span class="tk-string">&#039;/login&#039;</span><span class="tk-p">)</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Per-route middleware</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/reports&#039;</span><span class="tk-p">,</span> <span class="tk-class">ReportController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;reports&#039;</span><span class="tk-p">,</span> middleware<span class="tk-p">:</span> <span class="tk-p">[</span>
+    <span class="tk-keyword">new</span> <span class="tk-fn">RequireAuthentication</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-keyword">new</span> <span class="tk-fn">RateLimit</span><span class="tk-p">(</span>perMinute<span class="tk-p">:</span> <span class="tk-num">10</span><span class="tk-p">)</span><span class="tk-p">,</span>
+<span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Route middleware runs <em>inside</em> the global stack, after everything registered with <code>$app->middleware(...)</code>.</p>
+
+<h2>Names and URL generation</h2>
+
+<p>Naming a route means a path can change in one place.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$router</span> <span class="tk-p">=</span> <span class="tk-var">$app</span>-&gt;<span class="tk-fn">router</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$router</span>-&gt;<span class="tk-fn">urlFor</span><span class="tk-p">(</span><span class="tk-string">&#039;home&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>                              <span class="tk-comment">// &quot;/&quot;</span>
+<span class="tk-var">$router</span>-&gt;<span class="tk-fn">urlFor</span><span class="tk-p">(</span><span class="tk-string">&#039;users.show&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;id&#039;</span> =&gt; <span class="tk-num">42</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>          <span class="tk-comment">// &quot;/users/42&quot;</span>
+<span class="tk-var">$router</span>-&gt;<span class="tk-fn">urlFor</span><span class="tk-p">(</span><span class="tk-string">&#039;posts.show&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;slug&#039;</span> =&gt; <span class="tk-string">&#039;a b/c&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// &quot;/posts/a%20b%2Fc&quot;</span>
+<span class="tk-var">$router</span>-&gt;<span class="tk-fn">hasName</span><span class="tk-p">(</span><span class="tk-string">&#039;users.show&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>                       <span class="tk-comment">// true</span></code></pre></figure>
+
+<p>Generation is strict, so a broken link surfaces where it is built rather than as a 404 for whoever clicks it:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$router</span>-&gt;<span class="tk-fn">urlFor</span><span class="tk-p">(</span><span class="tk-string">&#039;users.show&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// UnknownRoute: Route &quot;users.show&quot; needs a value for {id}.</span>
+
+<span class="tk-var">$router</span>-&gt;<span class="tk-fn">urlFor</span><span class="tk-p">(</span><span class="tk-string">&#039;orders.show&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;id&#039;</span> =&gt; <span class="tk-string">&#039;abc&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// route is {id:\d+}</span>
+<span class="tk-comment">// UnknownRoute: The values given for route &quot;orders.show&quot; do not satisfy its pattern &quot;/orders/{id:\d+}&quot;.</span>
+
+<span class="tk-var">$router</span>-&gt;<span class="tk-fn">urlFor</span><span class="tk-p">(</span><span class="tk-string">&#039;typo&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// UnknownRoute: No route is named &quot;typo&quot;. Known names: home, users.show, posts.show.</span></code></pre></figure>
+
+<p>Duplicate names are rejected at boot too.</p>
+
+<h2>How matching works</h2>
+
+<ul>
+<li><strong>Static routes</strong> go into a hash keyed by method and path, so the common case costs one array lookup no matter how many routes exist.</li>
+<li><strong>Parameterised routes</strong> are scanned in registration order.</li>
+<li><strong>Trailing slashes</strong> are collapsed: <code>/docs</code> and <code>/docs/</code> address the same route.</li>
+<li><strong>No match</strong> gives 404; <strong>wrong method</strong> gives 405 with an <code>Allow</code> header listing what is accepted.</li>
+</ul>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>curl -i -X POST http://127.0.0.1:8080/articles/1
+HTTP/1.1 405 Method Not Allowed
+Allow: GET, DELETE</code></pre></figure>
+
+<h2>Debug-only routes</h2>
+
+<p>The closure receives the debug flag, so a route can exist only while debugging without the file reading the environment itself:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$debug</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/__routes&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span> =&gt; <span class="tk-class">Response</span>::<span class="tk-fn">text</span><span class="tk-p">(</span><span class="tk-string">&#039;...&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span> <span class="tk-string">&#039;debug.routes&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<h2>Inspecting the table</h2>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit routes
+GET     /                                        self-check
+GET     /avatar                                  avatar
+POST    /avatar                                  avatar.store
+GET     /health                                  health
+GET     /hello/{name}                            hello
+GET     /login                                   login
+POST    /login                                   login.attempt
+POST    /logout                                  logout
+GET     /notes                                   notes.index
+POST    /notes                                   notes.create
+POST    /notes/{id:\d+}/delete                   notes.delete</code></pre></figure>
+    </article>
+    <nav class="pager"><a href="configuration.html"><span>Previous</span>Configuration</a><a class="next" href="controllers.html"><span>Next</span>Controllers</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

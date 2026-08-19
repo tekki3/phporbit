@@ -1,0 +1,732 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * The phporbit CLI.
+ *
+ * `orbit serve` runs the framework's own HTTP server — the development target.
+ * It is a long-lived process by design, matching FrankenPHP's process model so
+ * that worker-safety problems surface locally.
+ */
+
+use App\Auth\DatabaseUserProvider;
+use PhpOrbit\Admin\AdminApplication;
+use PhpOrbit\Config\Environment;
+use PhpOrbit\Config\InvalidEnvFile;
+use PhpOrbit\Config\MissingConfiguration;
+use PhpOrbit\Console\ClassMaker;
+use PhpOrbit\Console\ControllerMaker;
+use PhpOrbit\Console\FormMaker;
+use PhpOrbit\Console\Lifetime;
+use PhpOrbit\Console\MiddlewareMaker;
+use PhpOrbit\Console\MigrationMaker;
+use PhpOrbit\Console\Scaffold;
+use PhpOrbit\Console\Variant;
+use PhpOrbit\Crypto\Key;
+use PhpOrbit\Database\ConnectionFailed;
+use PhpOrbit\Database\Migrator;
+use PhpOrbit\Kernel\Application;
+use PhpOrbit\Mail\MailFailed;
+use PhpOrbit\Mail\MailStatus;
+use PhpOrbit\Mail\Message;
+use PhpOrbit\Mail\PersistingMailer;
+use PhpOrbit\Sapi\OrbitServer;
+use PhpOrbit\Session\FileSessionStore;
+
+if (PHP_SAPI !== 'cli') {
+    fwrite(STDERR, 'orbit must be run from the command line.' . PHP_EOL);
+    exit(1);
+}
+
+$root = __DIR__;
+
+foreach ([$root . '/vendor/autoload.php', $root . '/../../autoload.php'] as $candidate) {
+    if (is_file($candidate)) {
+        require $candidate;
+        break;
+    }
+}
+
+if (!class_exists(Application::class)) {
+    fwrite(STDERR, 'Dependencies are not installed. Run: composer install' . PHP_EOL);
+    exit(1);
+}
+
+/**
+ * Extracts `--name=value` and `--flag` arguments.
+ *
+ * @param array<mixed> $argv raw arguments, whose element types PHP does not guarantee
+ * @return array<string, string>
+ */
+$parseOptions = static function (array $argv): array {
+    $options = [];
+
+    foreach ($argv as $argument) {
+        if (!is_string($argument) || !str_starts_with($argument, '--')) {
+            continue;
+        }
+
+        $pair = substr($argument, 2);
+        $separator = strpos($pair, '=');
+
+        if ($separator === false) {
+            $options[$pair] = '1';
+            continue;
+        }
+
+        $options[substr($pair, 0, $separator)] = substr($pair, $separator + 1);
+    }
+
+    return $options;
+};
+
+$usage = <<<TXT
+phporbit
+
+Usage:
+  orbit new <directory> [--demo] [--force]
+  orbit key:generate
+  orbit make:class <Name> [--singleton|--scoped] [--force]
+  orbit make:controller <Name> [--view] [--force]
+  orbit make:form <Name> [--fields=a:text,b:email] [--captcha]
+                         [--no-honeypot] [--controllers] [--force]
+  orbit make:middleware <Name> [--force]
+  orbit make:migration <name> [--table=x] [--sequential] [--force]
+  orbit serve [--host=127.0.0.1] [--port=8080] [--debug]
+  orbit ui [--host=127.0.0.1] [--port=8081] [--debug]
+  orbit routes
+  orbit migrate
+  orbit migrate:status
+  orbit migrate:rollback [--batches=1]
+  orbit db:seed
+  orbit mail:test --to=x@example.test [--from=x@example.test]
+  orbit mail:list [--status=sent|failed] [--limit=20]
+  orbit mail:resend <id>|--failed [--limit=50]
+  orbit storage:clear
+  orbit sessions:gc
+  orbit help
+
+Creating a project:
+  orbit new my-app            a blank application — one route, one controller
+  orbit new my-app --demo     the demo: auth, uploads, notes and the self-check
+
+  Neither includes this documentation; it belongs to the framework, not to
+  every project built on it.
+
+TXT;
+
+// Read through $_SERVER rather than the $argv global, which only exists when
+// register_argc_argv is on. This script is a SAPI boundary, so superglobal
+// access belongs here.
+$rawArguments = $_SERVER['argv'] ?? [];
+$arguments = is_array($rawArguments) ? array_slice($rawArguments, 1) : [];
+$command = is_string($arguments[0] ?? null) ? $arguments[0] : 'help';
+$options = $parseOptions($arguments);
+
+// Set in the real environment rather than written to the file, which is both
+// non-destructive and consistent with the precedence rule: what the process
+// was given always beats what .env says.
+if (isset($options['debug'])) {
+    putenv('APP_DEBUG=true');
+}
+
+$bootstrap = $root . '/app/bootstrap.php';
+
+if (!is_file($bootstrap)) {
+    fwrite(STDERR, sprintf('No application bootstrap at %s.', $bootstrap) . PHP_EOL);
+    exit(1);
+}
+
+try {
+    switch ($command) {
+    case 'new':
+        // Positional, and the only command that does not boot an application —
+        // there is no application yet.
+        $directory = null;
+        foreach (array_slice($arguments, 1) as $argument) {
+            if (is_string($argument) && !str_starts_with($argument, '--')) {
+                $directory = $argument;
+                break;
+            }
+        }
+
+        if ($directory === null) {
+            fwrite(STDERR, 'Which directory? Try: orbit new my-app' . PHP_EOL);
+            exit(1);
+        }
+
+        $variant = isset($options['demo']) ? Variant::Demo : Variant::Blank;
+
+        $scaffold = new Scaffold($root, static function (string $line): void {
+            fwrite(STDERR, $line . PHP_EOL);
+        });
+
+        try {
+            $created = $scaffold->create($directory, $variant, force: isset($options['force']));
+        } catch (RuntimeException $e) {
+            // Refusing to write into an occupied directory is the expected
+            // outcome, not a crash — say so without a stack trace.
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        printf("Created %s — %s\n\n", $directory, $variant->describe());
+        printf("  %d files written\n\n", count($created));
+        echo "Next:\n";
+        printf("  cd %s\n", $directory);
+        echo "  composer install\n";
+        echo "  ./orbit migrate\n";
+        echo "  ./orbit serve\n";
+        exit(0);
+
+    case 'key:generate':
+        // Writes nothing: printing it keeps the command safe to run anywhere,
+        // and makes it obvious that the value belongs in configuration the
+        // deployment supplies rather than in a file someone might commit.
+        echo Key::generate()->exportForConfiguration() . PHP_EOL;
+        exit(0);
+
+    case 'make:class':
+        // Generates source; there is no reason to boot the application first.
+        $name = null;
+        foreach (array_slice($arguments, 1) as $argument) {
+            if (is_string($argument) && !str_starts_with($argument, '--')) {
+                $name = $argument;
+                break;
+            }
+        }
+
+        if ($name === null) {
+            fwrite(STDERR, 'Which class? Try: orbit make:class Notes/NoteRepository' . PHP_EOL);
+            exit(1);
+        }
+
+        try {
+            $made = (new ClassMaker($root, static function (string $line): void {
+                echo $line . PHP_EOL;
+            }))->create(
+                $name,
+                // Mutually exclusive, and refused as a pair inside the enum so
+                // this script and the scaffolded one cannot disagree about it.
+                Lifetime::fromFlags(
+                    singleton: isset($options['singleton']),
+                    scoped: isset($options['scoped']),
+                ),
+                force: isset($options['force']),
+            );
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        printf("\n%s — %s\n", $made->className, $made->lifetime->describe());
+
+        // Printed rather than written, for the reason make:controller prints its
+        // route line: editing a file the developer owns means parsing and
+        // re-emitting their code.
+        if ($made->registrationSnippet !== null) {
+            echo PHP_EOL . 'Add to app/bootstrap.php:' . PHP_EOL . PHP_EOL;
+            echo '  ' . $made->importSnippet . PHP_EOL;
+            echo '  ' . $made->registrationSnippet . PHP_EOL;
+        }
+
+        echo PHP_EOL . 'Inject it where you need it:' . PHP_EOL . PHP_EOL;
+        echo '  ' . $made->importSnippet . PHP_EOL;
+        echo '  ' . $made->injectionSnippet . PHP_EOL;
+        exit(0);
+
+    case 'make:controller':
+        // Generates source; there is no reason to boot the application first.
+        $name = null;
+        foreach (array_slice($arguments, 1) as $argument) {
+            if (is_string($argument) && !str_starts_with($argument, '--')) {
+                $name = $argument;
+                break;
+            }
+        }
+
+        if ($name === null) {
+            fwrite(STDERR, 'Which controller? Try: orbit make:controller Home' . PHP_EOL);
+            exit(1);
+        }
+
+        try {
+            $made = (new ControllerMaker($root, static function (string $line): void {
+                echo $line . PHP_EOL;
+            }))->create($name, withView: isset($options['view']), force: isset($options['force']));
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        // Routes are not edited automatically: rewriting a file the developer
+        // owns means parsing and re-emitting their code, and getting that
+        // subtly wrong is worse than leaving one line to paste.
+        echo PHP_EOL . 'Add to app/routes.php:' . PHP_EOL . PHP_EOL;
+        echo '  ' . $made->importSnippet . PHP_EOL;
+        echo '  ' . $made->routeSnippet . PHP_EOL;
+        exit(0);
+
+    case 'make:form':
+        // Generates source; there is no reason to boot the application first.
+        $name = null;
+        foreach (array_slice($arguments, 1) as $argument) {
+            if (is_string($argument) && !str_starts_with($argument, '--')) {
+                $name = $argument;
+                break;
+            }
+        }
+
+        if ($name === null) {
+            fwrite(STDERR, 'Which form? Try: orbit make:form Contact --controllers' . PHP_EOL);
+            exit(1);
+        }
+
+        try {
+            $made = (new FormMaker($root, static function (string $line): void {
+                echo $line . PHP_EOL;
+            }))->create(
+                $name,
+                fields: $options['fields'] ?? null,
+                captcha: isset($options['captcha']),
+                // On unless turned off. A protection that has to be added after
+                // the fact is one that gets added after the first spam run.
+                honeypot: !isset($options['no-honeypot']),
+                withControllers: isset($options['controllers']),
+                force: isset($options['force']),
+            );
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        printf(
+            "\n%s — %d fields: %s\n",
+            $made->className,
+            count($made->fieldNames),
+            implode(', ', $made->fieldNames),
+        );
+
+        if ($made->routeSnippets !== []) {
+            echo PHP_EOL . 'Add to app/routes.php:' . PHP_EOL . PHP_EOL;
+
+            foreach ([...$made->importSnippets, ...$made->routeSnippets] as $line) {
+                echo '  ' . $line . PHP_EOL;
+            }
+        } else {
+            echo PHP_EOL . 'Build it from a controller:' . PHP_EOL . PHP_EOL;
+            echo '  ' . sprintf('use %s;', $made->className) . PHP_EOL;
+            echo '  ' . $made->injectionSnippet . PHP_EOL;
+            echo PHP_EOL . 'Or pass --controllers to have the two pages written too.' . PHP_EOL;
+        }
+
+        exit(0);
+
+    case 'make:middleware':
+        // Generates source; there is no reason to boot the application first.
+        $name = null;
+        foreach (array_slice($arguments, 1) as $argument) {
+            if (is_string($argument) && !str_starts_with($argument, '--')) {
+                $name = $argument;
+                break;
+            }
+        }
+
+        if ($name === null) {
+            fwrite(STDERR, 'Which middleware? Try: orbit make:middleware RequestId' . PHP_EOL);
+            exit(1);
+        }
+
+        try {
+            $made = (new MiddlewareMaker($root, static function (string $line): void {
+                echo $line . PHP_EOL;
+            }))->create($name, force: isset($options['force']));
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        // Not inserted automatically: where in the list it goes is meaning,
+        // not plumbing — session before CSRF, logging outermost — and that is
+        // a decision only the developer can make.
+        printf("\n%s\n", $made->className);
+        echo PHP_EOL . 'Add to the $app->middleware(...) list in app/bootstrap.php:' . PHP_EOL . PHP_EOL;
+        echo '  ' . $made->importSnippet . PHP_EOL;
+        echo '  ' . $made->registrationSnippet . PHP_EOL;
+        exit(0);
+
+    case 'make:migration':
+        // Generates source; there is no reason to boot the application first.
+        $name = null;
+        foreach (array_slice($arguments, 1) as $argument) {
+            if (is_string($argument) && !str_starts_with($argument, '--')) {
+                $name = $argument;
+                break;
+            }
+        }
+
+        if ($name === null) {
+            fwrite(STDERR, 'Which migration? Try: orbit make:migration create_articles_table' . PHP_EOL);
+            exit(1);
+        }
+
+        try {
+            $migration = (new MigrationMaker($root, static function (string $line): void {
+                echo $line . PHP_EOL;
+            }))->create(
+                $name,
+                table: $options['table'] ?? null,
+                sequential: isset($options['sequential']),
+                force: isset($options['force']),
+            );
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        echo PHP_EOL . 'Edit it, then run: orbit migrate' . PHP_EOL;
+        exit(0);
+
+    case 'serve':
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        // Applying pending migrations is a development convenience of this
+        // command only. The production entrypoints never touch the schema:
+        // several workers booting at once would race to alter the same tables.
+        $migrator = $app->container()->get(Migrator::class);
+
+        if ($migrator->pending() !== []) {
+            fwrite(STDERR, 'Applying pending migrations...' . PHP_EOL);
+
+            foreach ($migrator->migrate() as $name) {
+                fwrite(STDERR, '  ' . $name . PHP_EOL);
+            }
+        }
+
+        $server = new OrbitServer(
+            host: $options['host'] ?? '127.0.0.1',
+            port: (int) ($options['port'] ?? '8080'),
+        );
+
+        $server->run($app);
+        exit(0);
+
+    case 'ui':
+        // A second, self-contained application — never the one loaded from
+        // app/bootstrap.php. Its routes are never wired into app/routes.php
+        // either, so nothing here reaches a production deployment unless
+        // this command was actually run there, which is precisely the thing
+        // to avoid: see the warning below.
+        $host = $options['host'] ?? '127.0.0.1';
+
+        if (!in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
+            fwrite(STDERR, sprintf(
+                'Warning: binding the admin UI to "%s" exposes it beyond this machine. '
+                . 'It has no login — anyone who can reach it can run migrations, resend '
+                . 'mail and clear the template cache.' . PHP_EOL,
+                $host,
+            ));
+        }
+
+        $admin = AdminApplication::boot($root);
+
+        fwrite(STDERR, 'Starting the admin UI — migrations, mail, routes, sessions, storage.' . PHP_EOL);
+
+        $server = new OrbitServer(
+            host: $host,
+            port: (int) ($options['port'] ?? '8081'),
+        );
+
+        $server->run($admin);
+        exit(0);
+
+    case 'migrate':
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        $applied = $app->container()->get(Migrator::class)->migrate();
+
+        foreach ($applied as $name) {
+            echo 'Applied ' . $name . PHP_EOL;
+        }
+
+        if ($applied === []) {
+            echo 'Nothing to migrate.' . PHP_EOL;
+        }
+
+        exit(0);
+
+    case 'migrate:status':
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        $migrator = $app->container()->get(Migrator::class);
+        $batches = $migrator->batches();
+
+        foreach ($migrator->available() as $name) {
+            printf(
+                "%-10s %-40s %s\n",
+                isset($batches[$name]) ? 'applied' : 'pending',
+                $name,
+                isset($batches[$name]) ? 'batch ' . $batches[$name] : '',
+            );
+        }
+
+        exit(0);
+
+    case 'migrate:rollback':
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        $reversed = $app->container()->get(Migrator::class)
+            ->rollback((int) ($options['batches'] ?? '1'));
+
+        foreach ($reversed as $name) {
+            echo 'Reversed ' . $name . PHP_EOL;
+        }
+
+        if ($reversed === []) {
+            echo 'Nothing to roll back.' . PHP_EOL;
+        }
+
+        exit(0);
+
+    case 'db:seed':
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        $provider = $app->container()->get(DatabaseUserProvider::class);
+
+        if ($provider->findByEmail('demo@example.test') !== null) {
+            echo 'The demo account already exists.' . PHP_EOL;
+            exit(0);
+        }
+
+        $provider->create('demo@example.test', 'correct-horse-battery', 'Demo User');
+
+        echo 'Created demo@example.test / correct-horse-battery' . PHP_EOL;
+        exit(0);
+
+    case 'mail:test':
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        $to = $options['to'] ?? null;
+
+        if ($to === null) {
+            fwrite(STDERR, 'Which address? Try: orbit mail:test --to=you@example.test' . PHP_EOL);
+            exit(1);
+        }
+
+        $env = $app->container()->get(Environment::class);
+        $driver = $env->string('MAIL_DRIVER', 'array');
+        // Read directly rather than relying on the mailer's own default: only
+        // SmtpMailer applies one, and this command has to work the same way
+        // under every driver.
+        $from = $options['from'] ?? $env->raw('MAIL_FROM_ADDRESS');
+
+        if ($from === null || $from === '') {
+            fwrite(STDERR,
+                'No sender configured. Pass --from=you@example.test, or set '
+                . 'MAIL_FROM_ADDRESS in .env.' . PHP_EOL);
+            exit(1);
+        }
+
+        try {
+            $message = Message::to($to)
+                ->from($from)
+                ->subject('phporbit test message')
+                ->text(sprintf(
+                    "Sent by `orbit mail:test` at %s, through the %s driver.\n\n"
+                    . "If this arrived, MAIL_DRIVER=%s is delivering mail correctly.",
+                    gmdate('c'),
+                    $driver,
+                    $driver,
+                ));
+        } catch (InvalidArgumentException $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        try {
+            // Through PersistingMailer like any other send, so a test message
+            // is one more row in `orbit mail:list` — and, if it fails,
+            // resendable with `orbit mail:resend` once the problem is fixed.
+            $app->container()->get(PersistingMailer::class)->send($message);
+        } catch (MailFailed $e) {
+            fwrite(STDERR, sprintf('Send failed (driver: %s): %s', $driver, $e->getMessage()) . PHP_EOL);
+            exit(1);
+        }
+
+        if (in_array($driver, ['array', 'memory', 'null'], true)) {
+            printf(
+                "Accepted by the \"%s\" driver — nothing left this machine. "
+                . "Set MAIL_DRIVER=smtp to test real delivery.\n",
+                $driver,
+            );
+        } else {
+            printf("Sent to %s via %s.\n", $to, $driver);
+        }
+
+        exit(0);
+
+    case 'mail:list':
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        $status = null;
+
+        if (isset($options['status'])) {
+            $status = MailStatus::tryFrom($options['status']);
+
+            if ($status === null) {
+                fwrite(STDERR, sprintf(
+                    'Unknown status "%s". Use sent or failed.',
+                    $options['status'],
+                ) . PHP_EOL);
+                exit(1);
+            }
+        }
+
+        $entries = $app->container()->get(PersistingMailer::class)
+            ->history($status, (int) ($options['limit'] ?? '20'));
+
+        if ($entries === []) {
+            echo 'No mail logged.' . PHP_EOL;
+            exit(0);
+        }
+
+        foreach ($entries as $entry) {
+            printf(
+                "%-5d %-7s %-4d %-34s %-40s %s\n",
+                $entry->id,
+                $entry->status->value,
+                $entry->attempts,
+                implode(', ', array_map(static fn ($address): string => $address->envelope(), $entry->to)),
+                mb_strimwidth($entry->subjectLine, 0, 40, '…'),
+                $entry->updatedAt,
+            );
+        }
+
+        exit(0);
+
+    case 'mail:resend':
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        $mailer = $app->container()->get(PersistingMailer::class);
+
+        if (isset($options['failed'])) {
+            $failing = $mailer->history(MailStatus::Failed, (int) ($options['limit'] ?? '50'));
+
+            if ($failing === []) {
+                echo 'Nothing to resend.' . PHP_EOL;
+                exit(0);
+            }
+
+            $resent = 0;
+            $stillFailing = 0;
+
+            foreach ($failing as $entry) {
+                try {
+                    $mailer->resend($entry->id);
+                    printf("Resent #%d\n", $entry->id);
+                    $resent++;
+                } catch (MailFailed $e) {
+                    fwrite(STDERR, sprintf('Still failing #%d: %s', $entry->id, $e->getMessage()) . PHP_EOL);
+                    $stillFailing++;
+                }
+            }
+
+            printf("%d resent, %d still failing.\n", $resent, $stillFailing);
+            exit($stillFailing > 0 ? 1 : 0);
+        }
+
+        $id = null;
+        foreach (array_slice($arguments, 1) as $argument) {
+            if (is_string($argument) && !str_starts_with($argument, '--')) {
+                $id = $argument;
+                break;
+            }
+        }
+
+        if ($id === null || preg_match('/^\d+$/', $id) !== 1) {
+            fwrite(STDERR, 'Which mail? Try: orbit mail:resend 12, or orbit mail:resend --failed' . PHP_EOL);
+            exit(1);
+        }
+
+        try {
+            $entry = $mailer->resend((int) $id);
+        } catch (InvalidArgumentException | MailFailed $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        printf(
+            "Resent #%d to %s.\n",
+            $entry->id,
+            implode(', ', array_map(static fn ($address): string => $address->envelope(), $entry->to)),
+        );
+        exit(0);
+
+    case 'storage:clear':
+        // No reason to boot the application: the cache directory is a fixed
+        // convention (storage/cache/views), not something configuration
+        // changes. Safe to run at any time — TemplateEngine recompiles a
+        // template the moment it finds no compiled file waiting for it, so
+        // the very next render replaces whatever this deletes.
+        $directory = $root . '/storage/cache/views';
+        $removed = 0;
+
+        foreach (glob($directory . '/*') ?: [] as $file) {
+            if (is_file($file) && @unlink($file)) {
+                $removed++;
+            }
+        }
+
+        printf("Removed %d compiled template%s.\n", $removed, $removed === 1 ? '' : 's');
+        exit(0);
+
+    case 'sessions:gc':
+        // No reason to boot the application: the session directory is a fixed
+        // convention (storage/sessions), not something configuration changes,
+        // and garbage collection is pure filesystem work.
+        $removed = (new FileSessionStore($root . '/storage/sessions'))->collectGarbage();
+
+        printf("Removed %d expired session%s.\n", $removed, $removed === 1 ? '' : 's');
+        exit(0);
+
+    case 'routes':
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        $rows = [];
+        foreach ($app->router()->routes() as $route) {
+            $rows[] = [$route->method->value, $route->pattern, $route->name ?? ''];
+        }
+
+        usort($rows, static fn (array $a, array $b): int => [$a[1], $a[0]] <=> [$b[1], $b[0]]);
+
+        foreach ($rows as [$method, $pattern, $name]) {
+            printf("%-7s %-40s %s\n", $method, $pattern, $name);
+        }
+
+        exit(0);
+
+    case 'help':
+        echo $usage;
+        exit(0);
+
+    default:
+        fwrite(STDERR, sprintf('Unknown command "%s".', $command) . PHP_EOL . PHP_EOL . $usage);
+        exit(1);
+    }
+} catch (InvalidEnvFile | MissingConfiguration | ConnectionFailed $e) {
+    // A configuration mistake is the user's to fix, not a crash to debug: show
+    // the message plainly rather than a stack trace through the container.
+    fwrite(STDERR, 'Configuration error: ' . $e->getMessage() . PHP_EOL);
+    exit(1);
+}

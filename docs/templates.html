@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Templates — phporbit</title>
+<meta name="description" content="Auto-escaping output, control structures, layouts and sections, partials, and shared data.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html" class="current" aria-current="page">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Templates</h1>
+        <p class="summary">Auto-escaping output, control structures, layouts and sections, partials, and shared data.</p>
+        <p>Templates are <code>app/templates/*.orbit.php</code>. They compile to plain PHP once, then execute as fast as any other included file.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;articles/show&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+    <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-string">&#039;Reading list&#039;</span><span class="tk-p">,</span>
+    <span class="tk-string">&#039;article&#039;</span> =&gt; <span class="tk-var">$article</span><span class="tk-p">,</span>
+<span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Output</h2>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>{# Escaped. This is what you want essentially always. #}
+&lt;h1&gt;{{ $title }}&lt;/h1&gt;
+
+{# Not escaped. Deliberately loud, so it stands out in review. #}
+&lt;div&gt;{!! $renderedMarkdown !!}&lt;/div&gt;
+
+{# A comment. Removed at compile time; never reaches the browser. #}
+
+{# Literal braces, for Vue, Angular, Handlebars and friends. #}
+&lt;span&gt;@{{ notPhp }}&lt;/span&gt;</code></pre></figure>
+
+<div class="good">
+<b>The asymmetry is the design</b>
+<p><code>{{ }}</code> is shorter and easier to type than <code>{!! !!}</code>. The safe form has to be the convenient one, or people reach for the other by habit. Escaping is not something a template remembers to ask for — it is what output <em>is</em>.</p>
+</div>
+
+<h3>What values are allowed</h3>
+
+<p>Strings, numbers, booleans, <code>null</code> and <code>Stringable</code> render. Arrays and plain objects throw:</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>TemplateError: Cannot render a value of type array. Convert it in the handler
+  before passing it to the template.</code></pre></figure>
+
+<p>Better an error than the string <code>Array</code> appearing in a page, or a fatal from a bare cast.</p>
+
+<h2>Control structures</h2>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>@if($articles === [])
+    &lt;p&gt;Nothing published yet.&lt;/p&gt;
+@elseif(count($articles) === 1)
+    &lt;p&gt;One article.&lt;/p&gt;
+@else
+    &lt;p&gt;{{ count($articles) }} articles.&lt;/p&gt;
+@endif
+
+@foreach($articles as $article)
+    &lt;article&gt;
+        &lt;h2&gt;{{ $article[&#039;title&#039;] }}&lt;/h2&gt;
+        &lt;p&gt;{{ $article[&#039;excerpt&#039;] }}&lt;/p&gt;
+    &lt;/article&gt;
+@endforeach
+
+@for($page = 1; $page &lt;= $pages; $page++)
+    &lt;a href=&quot;?page={{ $page }}&quot;&gt;{{ $page }}&lt;/a&gt;
+@endfor
+
+@while($row = $cursor-&gt;next())
+    &lt;li&gt;{{ $row[&#039;name&#039;] }}&lt;/li&gt;
+@endwhile</code></pre></figure>
+
+<p>An unrecognised <code>@word</code> passes through untouched — it is far more likely to be prose (an email address, a decorator in a code sample) than a typo'd directive.</p>
+
+<h2>Layouts and sections</h2>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>{# app/templates/layout.orbit.php #}
+&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+    &lt;title&gt;{{ $title }}&lt;/title&gt;
+    @yield(&#039;head&#039;)
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;main&gt;@yield(&#039;content&#039;)&lt;/main&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre></figure>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>{# app/templates/articles/show.orbit.php #}
+@extends(&#039;layout&#039;)
+
+@section(&#039;head&#039;)
+    &lt;meta name=&quot;description&quot; content=&quot;{{ $article[&#039;excerpt&#039;] }}&quot;&gt;
+@endsection
+
+@section(&#039;content&#039;)
+    &lt;h1&gt;{{ $article[&#039;title&#039;] }}&lt;/h1&gt;
+    {!! $article[&#039;html&#039;] !!}
+@endsection</code></pre></figure>
+
+<p>The child renders first, collecting its sections; the layout renders second and pulls them out with <code>@yield</code>. Anything the child emits outside a section becomes the implicit <code>content</code> section, so a layout that yields only <code>content</code> works with a template that never declares one.</p>
+
+<p>A section left unclosed is caught with the template and section named, rather than producing a blank page.</p>
+
+<h2>Partials</h2>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>@include(&#039;partials/pagination&#039;)
+
+{# Extra values are merged over the current ones #}
+@include(&#039;partials/button&#039;)</code></pre></figure>
+
+<p>A partial sees the including template's data.</p>
+
+<h2>Shared data</h2>
+
+<p>Values every page needs are supplied once, at boot:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$templates</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-fn">TemplateEngine</span><span class="tk-p">(</span>
+    <span class="tk-var">$root</span> <span class="tk-p">.</span> <span class="tk-string">&#039;/app/templates&#039;</span><span class="tk-p">,</span>
+    <span class="tk-var">$storage</span> <span class="tk-p">.</span> <span class="tk-string">&#039;/cache/views&#039;</span><span class="tk-p">,</span>
+    alwaysRecompile<span class="tk-p">:</span> <span class="tk-var">$debug</span><span class="tk-p">,</span>
+    shared<span class="tk-p">:</span> <span class="tk-p">[</span>
+        <span class="tk-string">&#039;appUrl&#039;</span> =&gt; <span class="tk-var">$env</span>-&gt;<span class="tk-keyword">string</span><span class="tk-p">(</span><span class="tk-string">&#039;APP_URL&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;http://localhost:8080&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-string">&#039;sapi&#039;</span> =&gt; <span class="tk-class">PHP_SAPI</span><span class="tk-p">,</span>
+        <span class="tk-string">&#039;phpVersion&#039;</span> =&gt; <span class="tk-class">PHP_VERSION</span><span class="tk-p">,</span>
+    <span class="tk-p">]</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>&lt;meta property=&quot;og:image&quot; content=&quot;{{ $appUrl }}/assets/brand/social-card.png&quot;&gt;
+&lt;footer&gt;Served by {{ $sapi }} on PHP {{ $phpVersion }}.&lt;/footer&gt;</code></pre></figure>
+
+<p>Per-render data wins over shared data, so a page can override one value without affecting any other page.</p>
+
+<div class="note">
+<b>Why constructor, not a setter</b>
+<p>A mutable bag on the engine would be per-request state living on a process-lifetime service — one page's values leaking into the next request's render. Supplying them at construction makes that impossible.</p>
+</div>
+
+<h2>Compilation and caching</h2>
+
+<p>A template is compiled to PHP and cached under <code>storage/cache/views</code>. It recompiles when the source is newer, or on every render when <code>alwaysRecompile</code> is on — which <code>--debug</code> sets, so edits appear without clearing anything by hand.</p>
+
+<p>Compiled files are written to a temporary name and renamed into place. A worker must never <code>require</code> a file another process is halfway through writing.</p>
+
+<p>The staleness check compares file modification times, which a deploy method that preserves them (some <code>rsync</code> and tarball-extraction flows do) can defeat. <code>orbit storage:clear</code> deletes everything under <code>storage/cache/views</code> unconditionally — safe at any time, since the next render just recompiles what it finds missing.</p>
+
+<h2>Two things templates cannot do</h2>
+
+<p><strong>Raw PHP tags are neutralised.</strong> A literal <code>&lt;?</code> renders as text. Every executable construct comes from a directive the compiler knows about, which keeps templates readable and stops a stray tag from becoming a surprise.</p>
+
+<p><strong>Template names are validated, not sanitised.</strong> Names may contain letters, digits, underscores, hyphens and forward slashes:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$view</span>-&gt;<span class="tk-fn">render</span><span class="tk-p">(</span><span class="tk-string">&#039;../../../etc/passwd&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// TemplateError: Invalid template name &quot;../../../etc/passwd&quot;. Names may contain</span>
+<span class="tk-comment">//   letters, digits, underscores, hyphens and forward slashes only.</span></code></pre></figure>
+
+<p>A name that reached the engine from a request could otherwise compile and execute an arbitrary file.</p>
+
+<h2>Rendering without a response</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$html</span> <span class="tk-p">=</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">render</span><span class="tk-p">(</span><span class="tk-string">&#039;emails/welcome&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;name&#039;</span> =&gt; <span class="tk-var">$user</span>-&gt;name<span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">exists</span><span class="tk-p">(</span><span class="tk-string">&#039;emails/welcome&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// true</span></code></pre></figure>
+
+<h2>Escaping inside a template</h2>
+
+<p><code>{{ }}</code> escapes for HTML text. For other contexts, call the escaper explicitly:</p>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>&lt;a href=&quot;{!! PhpOrbit\Security\Escaper::urlAttribute($link) !!}&quot;&gt;Open&lt;/a&gt;
+
+&lt;button data-name=&quot;{!! PhpOrbit\Security\Escaper::attribute($name) !!}&quot;&gt;Save&lt;/button&gt;
+
+&lt;script&gt;
+    const user = {!! PhpOrbit\Security\Escaper::js($name) !!};
+&lt;/script&gt;</code></pre></figure>
+
+<p>Note that <code>js()</code> includes its own quotes — do not add more. <a href="security.html">Escaping in detail &rarr;</a></p>
+    </article>
+    <nav class="pager"><a href="middleware.html"><span>Previous</span>Middleware</a><a class="next" href="database.html"><span>Next</span>Database</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

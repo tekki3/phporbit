@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Responses — phporbit</title>
+<meta name="description" content="Building responses, status codes, headers, cookies, and the security defaults you get for free.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html" class="current" aria-current="page">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Responses</h1>
+        <p class="summary">Building responses, status codes, headers, cookies, and the security defaults you get for free.</p>
+        <p><code>Response</code> is immutable. Constructors are named for what you are sending.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Response</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Status</span><span class="tk-p">;</span>
+
+<span class="tk-class">Response</span>::<span class="tk-fn">text</span><span class="tk-p">(</span><span class="tk-string">&#039;Hello.&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>                             <span class="tk-comment">// text/plain; charset=utf-8</span>
+<span class="tk-class">Response</span>::<span class="tk-fn">html</span><span class="tk-p">(</span><span class="tk-string">&#039;&lt;h1&gt;Hello&lt;/h1&gt;&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>                     <span class="tk-comment">// text/html; charset=utf-8</span>
+<span class="tk-class">Response</span>::<span class="tk-fn">json</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;id&#039;</span> =&gt; <span class="tk-num">42</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>                         <span class="tk-comment">// application/json; charset=utf-8</span>
+<span class="tk-class">Response</span>::<span class="tk-fn">redirect</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>                      <span class="tk-comment">// 302 with Location</span>
+<span class="tk-class">Response</span>::<span class="tk-fn">redirect</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles&#039;</span><span class="tk-p">,</span> <span class="tk-class">Status</span>::<span class="tk-class">MovedPermanently</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-class">Response</span>::<span class="tk-fn">noContent</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                                <span class="tk-comment">// 204, body suppressed</span>
+<span class="tk-class">Response</span>::<span class="tk-fn">make</span><span class="tk-p">(</span><span class="tk-class">Status</span>::<span class="tk-class">Created</span><span class="tk-p">,</span> <span class="tk-var">$body</span><span class="tk-p">)</span><span class="tk-p">;</span>               <span class="tk-comment">// anything else</span></code></pre></figure>
+
+<p>Every one of these states a charset. Omitting it invites the browser to sniff the encoding, which is an XSS vector.</p>
+
+<h2>Status codes</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-class">Response</span>::<span class="tk-fn">text</span><span class="tk-p">(</span><span class="tk-string">&#039;Not found.&#039;</span><span class="tk-p">,</span> <span class="tk-class">Status</span>::<span class="tk-class">NotFound</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-class">Response</span>::<span class="tk-fn">json</span><span class="tk-p">(</span><span class="tk-var">$errors</span><span class="tk-p">,</span> <span class="tk-class">Status</span>::<span class="tk-class">UnprocessableEntity</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$response</span>-&gt;status<span class="tk-p">;</span>                    <span class="tk-comment">// Status enum</span>
+<span class="tk-var">$response</span>-&gt;status-&gt;value<span class="tk-p">;</span>             <span class="tk-comment">// 404</span>
+<span class="tk-var">$response</span>-&gt;status-&gt;<span class="tk-fn">reasonPhrase</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// &quot;Not Found&quot;</span>
+<span class="tk-var">$response</span>-&gt;status-&gt;<span class="tk-fn">allowsBody</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>      <span class="tk-comment">// false for 204 and 304</span></code></pre></figure>
+
+<p>Available cases cover the common set: <code>Ok</code>, <code>Created</code>, <code>NoContent</code>, <code>MovedPermanently</code>, <code>Found</code>, <code>NotModified</code>, <code>BadRequest</code>, <code>Unauthorized</code>, <code>Forbidden</code>, <code>NotFound</code>, <code>MethodNotAllowed</code>, <code>Conflict</code>, <code>PayloadTooLarge</code>, <code>UnprocessableEntity</code>, <code>TooManyRequests</code>, <code>InternalServerError</code>, <code>NotImplemented</code>, <code>ServiceUnavailable</code>.</p>
+
+<h2>Security headers, by default</h2>
+
+<p>Every response carries these unless you override them:</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src &#039;self&#039;; frame-ancestors &#039;none&#039;; base-uri &#039;self&#039;</code></pre></figure>
+
+<div class="good">
+<b>Why not middleware</b>
+<p>They are applied in <code>Response</code> itself rather than by a layer. A 500 built on the error path — where middleware may have been skipped entirely — still carries them. A header that only appears when everything went well is a header you cannot rely on.</p>
+</div>
+
+<p>Overriding is per response, when a page genuinely needs it:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">html</span><span class="tk-p">(</span><span class="tk-var">$embeddable</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">withHeader</span><span class="tk-p">(</span><span class="tk-string">&#039;X-Frame-Options&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;SAMEORIGIN&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">withHeader</span><span class="tk-p">(</span><span class="tk-string">&#039;Content-Security-Policy&#039;</span><span class="tk-p">,</span> <span class="tk-string">&quot;default-src &#039;self&#039;; img-src https:&quot;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Headers</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$response</span>
+    -&gt;<span class="tk-fn">withHeader</span><span class="tk-p">(</span><span class="tk-string">&#039;Cache-Control&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;no-store&#039;</span><span class="tk-p">)</span>      <span class="tk-comment">// replaces</span>
+    -&gt;<span class="tk-fn">withAddedHeader</span><span class="tk-p">(</span><span class="tk-string">&#039;Vary&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;Accept-Encoding&#039;</span><span class="tk-p">)</span>   <span class="tk-comment">// appends</span>
+    -&gt;<span class="tk-fn">withStatus</span><span class="tk-p">(</span><span class="tk-class">Status</span>::<span class="tk-class">Created</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">withBody</span><span class="tk-p">(</span><span class="tk-var">$newBody</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p><code>Content-Length</code> is computed by the adapter — you never set it.</p>
+
+<h2>Cookies</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Cookie</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\SameSite</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Defaults: HttpOnly, SameSite=Lax, Path=/, Secure.</span>
+<span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">redirect</span><span class="tk-p">(</span><span class="tk-string">&#039;/&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">withCookie</span><span class="tk-p">(</span>
+    <span class="tk-class">Cookie</span>::<span class="tk-fn">forRequest</span><span class="tk-p">(</span><span class="tk-var">$request</span><span class="tk-p">,</span> <span class="tk-string">&#039;theme&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;dark&#039;</span><span class="tk-p">,</span> expires<span class="tk-p">:</span> <span class="tk-fn">time</span><span class="tk-p">(</span><span class="tk-p">)</span> <span class="tk-p">+</span> <span class="tk-num">86400</span><span class="tk-p">)</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<div class="note">
+<b>Why <code>forRequest()</code></b>
+<p><code>Secure</code> cannot simply default to true: a Secure cookie is never sent over plain HTTP, which would silently break the built-in server on <code>http://localhost</code>. <code>forRequest()</code> reads the scheme off the request, so the flag is right in development and in production without a conditional at the call site.</p>
+</div>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// Full control when you need it</span>
+<span class="tk-keyword">new</span> <span class="tk-fn">Cookie</span><span class="tk-p">(</span>
+    name<span class="tk-p">:</span> <span class="tk-string">&#039;preferences&#039;</span><span class="tk-p">,</span>
+    value<span class="tk-p">:</span> <span class="tk-var">$encoded</span><span class="tk-p">,</span>
+    expires<span class="tk-p">:</span> <span class="tk-fn">time</span><span class="tk-p">(</span><span class="tk-p">)</span> <span class="tk-p">+</span> <span class="tk-num">2592000</span><span class="tk-p">,</span>
+    path<span class="tk-p">:</span> <span class="tk-string">&#039;/&#039;</span><span class="tk-p">,</span>
+    domain<span class="tk-p">:</span> <span class="tk-keyword">null</span><span class="tk-p">,</span>
+    secure<span class="tk-p">:</span> <span class="tk-keyword">true</span><span class="tk-p">,</span>
+    httpOnly<span class="tk-p">:</span> <span class="tk-keyword">false</span><span class="tk-p">,</span>               <span class="tk-comment">// deliberately readable by script</span>
+    sameSite<span class="tk-p">:</span> <span class="tk-class">SameSite</span>::<span class="tk-class">Strict</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Removing one — attributes must match those it was set with</span>
+<span class="tk-class">Response</span>::<span class="tk-fn">redirect</span><span class="tk-p">(</span><span class="tk-string">&#039;/&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">withCookie</span><span class="tk-p">(</span>
+    <span class="tk-class">Cookie</span>::<span class="tk-fn">expired</span><span class="tk-p">(</span><span class="tk-string">&#039;theme&#039;</span><span class="tk-p">,</span> secure<span class="tk-p">:</span> <span class="tk-var">$request</span>-&gt;uri-&gt;<span class="tk-fn">isSecure</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Cookie names and values are validated: a control character, space, comma, semicolon, quote or backslash in a value throws rather than being silently encoded, because those characters end the attribute early and let the rest forge cookie attributes of its own. Encode the value first — base64 or URL-encoding — if it might contain them.</p>
+
+<p><code>SameSite::None</code> without <code>Secure</code> also throws, since browsers reject that combination anyway.</p>
+
+<h2>JSON and HTML injection</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-class">Response</span>::<span class="tk-fn">json</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;note&#039;</span> =&gt; <span class="tk-string">&#039;&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// {&quot;note&quot;:&quot;&lt;\/script&gt;&lt;script&gt;alert(1)&lt;\/script&gt;&quot;}</span></code></pre></figure>
+
+<p>JSON is encoded with the <code>JSON_HEX_*</code> flags, so a payload containing <code>&lt;/script&gt;</code> cannot break out if the response is inlined into a page.</p>
+
+<h2>HEAD requests</h2>
+
+<p>A <code>HEAD</code> is routed to the matching <code>GET</code> handler; the kernel strips the body afterwards. Your handler never checks for it. Headers stay identical, which is the point of the method.</p>
+
+<h2>204 and 304</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$response</span> <span class="tk-p">=</span> <span class="tk-class">Response</span>::<span class="tk-fn">noContent</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">withBody</span><span class="tk-p">(</span><span class="tk-string">&#039;ignored&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$response</span>-&gt;body<span class="tk-p">;</span>        <span class="tk-comment">// &quot;ignored&quot;  — what you set</span>
+<span class="tk-var">$response</span>-&gt;<span class="tk-fn">wireBody</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>  <span class="tk-comment">// &quot;&quot;         — what is actually sent</span></code></pre></figure>
+
+<p>Responses that must not carry a body do not, regardless of what the handler built. The adapters send <code>wireBody()</code>.</p>
+
+<h2>Rendering templates</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// TemplateEngine::respond() is Response::html() around a render.</span>
+<span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;articles/show&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+    <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-var">$article</span><span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">]</span><span class="tk-p">,</span>
+    <span class="tk-string">&#039;article&#039;</span> =&gt; <span class="tk-var">$article</span><span class="tk-p">,</span>
+<span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;articles/new&#039;</span><span class="tk-p">,</span> <span class="tk-var">$data</span><span class="tk-p">,</span> <span class="tk-class">Status</span>::<span class="tk-class">UnprocessableEntity</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Error responses</h2>
+
+<p>Uncaught exceptions become a 500. Outside debug mode the body says nothing about the cause:</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>Internal Server Error</code></pre></figure>
+
+<p>With <code>--debug</code>, the class, message, file, line and stack trace are rendered instead. Exception messages routinely contain file paths, SQL and credentials, which is why that is opt-in and never the default.</p>
+    </article>
+    <nav class="pager"><a href="requests.html"><span>Previous</span>Requests</a><a class="next" href="forms.html"><span>Next</span>Forms</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Authentication — phporbit</title>
+<meta name="description" content="Signing users in and out, password hashing, guarding routes, and throttling brute force.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html" class="current" aria-current="page">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Authentication</h1>
+        <p class="summary">Signing users in and out, password hashing, guarding routes, and throttling brute force.</p>
+        <p>Four pieces: an <code>Identity</code> (your user), a <code>UserProvider</code> (how to find one), a <code>PasswordHasher</code>, and an <code>Authenticator</code> that ties them to the session.</p>
+
+<h2>Your user</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">namespace</span> <span class="tk-class">App\Models</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Auth\Identity</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">User</span> <span class="tk-keyword">implements</span> <span class="tk-class">Identity</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span>
+        <span class="tk-keyword">public</span> <span class="tk-keyword">readonly</span> <span class="tk-keyword">int</span> <span class="tk-var">$id</span><span class="tk-p">,</span>
+        <span class="tk-keyword">public</span> <span class="tk-keyword">readonly</span> <span class="tk-keyword">string</span> <span class="tk-var">$email</span><span class="tk-p">,</span>
+        <span class="tk-keyword">public</span> <span class="tk-keyword">readonly</span> <span class="tk-keyword">string</span> <span class="tk-var">$displayName</span><span class="tk-p">,</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-keyword">string</span> <span class="tk-var">$passwordHash</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">authIdentifier</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">string</span>
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">return</span> (string) <span class="tk-var">$this</span>-&gt;id<span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">passwordHash</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">string</span>
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;passwordHash<span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<h2>Finding one</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">namespace</span> <span class="tk-class">App\Auth</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Auth\Identity</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Auth\UserProvider</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Connection</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">DatabaseUserProvider</span> <span class="tk-keyword">implements</span> <span class="tk-class">UserProvider</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span><span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span>
+    <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">findByIdentifier</span><span class="tk-p">(</span><span class="tk-keyword">string</span> <span class="tk-var">$identifier</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-p">?</span><span class="tk-class">Identity</span>
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-fn">preg_match</span><span class="tk-p">(</span><span class="tk-string">&#039;/^\d+$/&#039;</span><span class="tk-p">,</span> <span class="tk-var">$identifier</span><span class="tk-p">)</span> !== <span class="tk-num">1</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+            <span class="tk-keyword">return</span> <span class="tk-keyword">null</span><span class="tk-p">;</span>
+        <span class="tk-p">}</span>
+
+        <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;<span class="tk-fn">hydrate</span><span class="tk-p">(</span>
+            <span class="tk-var">$this</span>-&gt;database-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;users&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> (int) <span class="tk-var">$identifier</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">first</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">findByEmail</span><span class="tk-p">(</span><span class="tk-keyword">string</span> <span class="tk-var">$email</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-p">?</span><span class="tk-class">Identity</span>
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;<span class="tk-fn">hydrate</span><span class="tk-p">(</span>
+            <span class="tk-var">$this</span>-&gt;database-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;users&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;email&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> <span class="tk-fn">strtolower</span><span class="tk-p">(</span><span class="tk-fn">trim</span><span class="tk-p">(</span><span class="tk-var">$email</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">first</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">updatePasswordHash</span><span class="tk-p">(</span><span class="tk-class">Identity</span> <span class="tk-var">$user</span><span class="tk-p">,</span> <span class="tk-keyword">string</span> <span class="tk-var">$hash</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$this</span>-&gt;database-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;users&#039;</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> (int) <span class="tk-var">$user</span>-&gt;<span class="tk-fn">authIdentifier</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">update</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;password_hash&#039;</span> =&gt; <span class="tk-var">$hash</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-comment">/**
+     * @param array&lt;string, scalar|null&gt;|null $row
+     */</span>
+    <span class="tk-keyword">private</span> <span class="tk-keyword">function</span> <span class="tk-fn">hydrate</span><span class="tk-p">(</span><span class="tk-p">?</span>array <span class="tk-var">$row</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-p">?</span><span class="tk-class">User</span>
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">return</span> <span class="tk-var">$row</span> === <span class="tk-keyword">null</span> <span class="tk-p">?</span> <span class="tk-keyword">null</span> <span class="tk-p">:</span> <span class="tk-keyword">new</span> <span class="tk-fn">User</span><span class="tk-p">(</span>
+            (int) <span class="tk-var">$row</span><span class="tk-p">[</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">]</span><span class="tk-p">,</span>
+            (string) <span class="tk-var">$row</span><span class="tk-p">[</span><span class="tk-string">&#039;email&#039;</span><span class="tk-p">]</span><span class="tk-p">,</span>
+            (string) <span class="tk-var">$row</span><span class="tk-p">[</span><span class="tk-string">&#039;display_name&#039;</span><span class="tk-p">]</span><span class="tk-p">,</span>
+            (string) <span class="tk-var">$row</span><span class="tk-p">[</span><span class="tk-string">&#039;password_hash&#039;</span><span class="tk-p">]</span><span class="tk-p">,</span>
+        <span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<h2>Signing in</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">LoginAttemptController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Authenticator</span> <span class="tk-var">$auth</span><span class="tk-p">,</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">LoginThrottle</span> <span class="tk-var">$throttle</span><span class="tk-p">,</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Session</span> <span class="tk-var">$session</span><span class="tk-p">,</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">TemplateEngine</span> <span class="tk-var">$view</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$email</span> <span class="tk-p">=</span> <span class="tk-var">$request</span>-&gt;<span class="tk-fn">form</span><span class="tk-p">(</span><span class="tk-string">&#039;email&#039;</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;&#039;</span><span class="tk-p">;</span>
+
+        <span class="tk-comment">// You build the key. See &quot;Throttling&quot; below for why it combines both.</span>
+        <span class="tk-var">$key</span> <span class="tk-p">=</span> <span class="tk-fn">mb_strtolower</span><span class="tk-p">(</span><span class="tk-var">$email</span><span class="tk-p">)</span> <span class="tk-p">.</span> <span class="tk-string">&#039;|&#039;</span> <span class="tk-p">.</span> <span class="tk-p">(</span><span class="tk-var">$request</span>-&gt;headers-&gt;<span class="tk-fn">first</span><span class="tk-p">(</span><span class="tk-string">&#039;X-Forwarded-For&#039;</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;local&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$this</span>-&gt;throttle-&gt;<span class="tk-fn">tooManyAttempts</span><span class="tk-p">(</span><span class="tk-var">$key</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+            <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;login&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+                <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-string">&#039;Sign in&#039;</span><span class="tk-p">,</span>
+                <span class="tk-string">&#039;error&#039;</span> =&gt; <span class="tk-fn">sprintf</span><span class="tk-p">(</span><span class="tk-string">&#039;Too many attempts. Try again in %d seconds.&#039;</span><span class="tk-p">,</span> <span class="tk-var">$this</span>-&gt;throttle-&gt;<span class="tk-fn">retryAfter</span><span class="tk-p">(</span><span class="tk-var">$key</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">,</span>
+            <span class="tk-p">]</span><span class="tk-p">,</span> <span class="tk-class">Status</span>::<span class="tk-class">TooManyRequests</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-p">}</span>
+
+        <span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-p">!</span><span class="tk-var">$this</span>-&gt;auth-&gt;<span class="tk-fn">attempt</span><span class="tk-p">(</span><span class="tk-var">$email</span><span class="tk-p">,</span> <span class="tk-var">$request</span>-&gt;<span class="tk-fn">form</span><span class="tk-p">(</span><span class="tk-string">&#039;password&#039;</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+            <span class="tk-var">$this</span>-&gt;throttle-&gt;<span class="tk-fn">record</span><span class="tk-p">(</span><span class="tk-var">$key</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+            <span class="tk-comment">// Never say which of the two was wrong.</span>
+            <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;login&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+                <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-string">&#039;Sign in&#039;</span><span class="tk-p">,</span>
+                <span class="tk-string">&#039;error&#039;</span> =&gt; <span class="tk-string">&#039;Those credentials do not match.&#039;</span><span class="tk-p">,</span>
+            <span class="tk-p">]</span><span class="tk-p">,</span> <span class="tk-class">Status</span>::<span class="tk-class">UnprocessableEntity</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-p">}</span>
+
+        <span class="tk-var">$this</span>-&gt;throttle-&gt;<span class="tk-fn">clear</span><span class="tk-p">(</span><span class="tk-var">$key</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">redirect</span><span class="tk-p">(</span><span class="tk-var">$this</span>-&gt;session-&gt;<span class="tk-fn">takeFlash</span><span class="tk-p">(</span><span class="tk-class">RequireAuthentication</span>::<span class="tk-class">INTENDED_KEY</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;/&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p><code>attempt()</code> does the rest: verifies the password, regenerates the session id, rotates the CSRF token, and rehashes the password if the parameters have changed since it was stored.</p>
+
+<h2>The Authenticator</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$auth</span>-&gt;<span class="tk-fn">check</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                      <span class="tk-comment">// bool — is someone signed in?</span>
+<span class="tk-var">$auth</span>-&gt;<span class="tk-fn">guest</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                      <span class="tk-comment">// the inverse</span>
+<span class="tk-var">$auth</span>-&gt;<span class="tk-fn">user</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                       <span class="tk-comment">// ?Identity — re-read per request</span>
+<span class="tk-var">$auth</span>-&gt;<span class="tk-fn">attempt</span><span class="tk-p">(</span><span class="tk-var">$email</span><span class="tk-p">,</span> <span class="tk-var">$password</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// bool</span>
+<span class="tk-var">$auth</span>-&gt;<span class="tk-fn">login</span><span class="tk-p">(</span><span class="tk-var">$user</span><span class="tk-p">)</span><span class="tk-p">;</span>                 <span class="tk-comment">// sign in an Identity you already have</span>
+<span class="tk-var">$auth</span>-&gt;<span class="tk-fn">logout</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                     <span class="tk-comment">// sign out</span></code></pre></figure>
+
+<p>Only the identifier goes into the session; the user is loaded per request. A deactivated or deleted account therefore loses access on its very next request, rather than whenever the session happens to expire.</p>
+
+<h2>Guarding routes</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Auth\RequireAuthentication</span><span class="tk-p">;</span>
+
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">withMiddleware</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-keyword">new</span> <span class="tk-fn">RequireAuthentication</span><span class="tk-p">(</span><span class="tk-string">&#039;/login&#039;</span><span class="tk-p">)</span><span class="tk-p">]</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-p">(</span><span class="tk-class">RouteCollection</span> <span class="tk-var">$routes</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span> <span class="tk-p">{</span>
+    <span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/account&#039;</span><span class="tk-p">,</span> <span class="tk-class">AccountController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;account&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-var">$routes</span>-&gt;<span class="tk-fn">post</span><span class="tk-p">(</span><span class="tk-string">&#039;/account&#039;</span><span class="tk-p">,</span> <span class="tk-class">UpdateAccountController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;account.update&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Guests are redirected, and where they were heading is flashed so they land there after signing in:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$intended</span> <span class="tk-p">=</span> <span class="tk-var">$session</span>-&gt;<span class="tk-fn">takeFlash</span><span class="tk-p">(</span><span class="tk-class">RequireAuthentication</span>::<span class="tk-class">INTENDED_KEY</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;/&#039;</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Password hashing</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$hasher</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-fn">PasswordHasher</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$hash</span> <span class="tk-p">=</span> <span class="tk-var">$hasher</span>-&gt;<span class="tk-fn">hash</span><span class="tk-p">(</span><span class="tk-var">$plain</span><span class="tk-p">)</span><span class="tk-p">;</span>              <span class="tk-comment">// Argon2id where available, bcrypt otherwise</span>
+<span class="tk-var">$hasher</span>-&gt;<span class="tk-fn">verify</span><span class="tk-p">(</span><span class="tk-var">$plain</span><span class="tk-p">,</span> <span class="tk-var">$hash</span><span class="tk-p">)</span><span class="tk-p">;</span>             <span class="tk-comment">// bool</span>
+<span class="tk-var">$hasher</span>-&gt;<span class="tk-fn">needsRehash</span><span class="tk-p">(</span><span class="tk-var">$hash</span><span class="tk-p">)</span><span class="tk-p">;</span>                <span class="tk-comment">// true once parameters change</span></code></pre></figure>
+
+<div class="warn">
+<b>Passwords over 72 bytes are rejected</b>
+<p>bcrypt silently truncates at 72 bytes, which turns a long passphrase into a much weaker secret without telling anyone. <code>hash()</code> throws rather than accepting input it cannot represent faithfully. Say so in your form's validation.</p>
+</div>
+
+<h2>Two timing defences</h2>
+
+<h3>Unknown accounts still cost a verification</h3>
+
+<p>When <code>findByEmail()</code> returns nothing, <code>attempt()</code> runs a decoy verification against a fixed hash. Without it, a failed lookup returns in microseconds and a successful one takes the full hashing time — which is enough to enumerate registered addresses.</p>
+
+<h3>Comparisons are constant-time</h3>
+
+<p>Tokens are compared with <code>hash_equals</code>, and passwords via <code>password_verify</code>. Neither reveals how much of the value was correct.</p>
+
+<h2>Throttling</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$throttle</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-fn">LoginThrottle</span><span class="tk-p">(</span><span class="tk-var">$database</span><span class="tk-p">,</span> maxAttempts<span class="tk-p">:</span> <span class="tk-num">5</span><span class="tk-p">,</span> windowSeconds<span class="tk-p">:</span> <span class="tk-num">900</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// The key is yours to build — the throttle stores it hashed and counts it.</span>
+<span class="tk-var">$key</span> <span class="tk-p">=</span> <span class="tk-fn">mb_strtolower</span><span class="tk-p">(</span><span class="tk-var">$email</span><span class="tk-p">)</span> <span class="tk-p">.</span> <span class="tk-string">&#039;|&#039;</span> <span class="tk-p">.</span> <span class="tk-p">(</span><span class="tk-var">$request</span>-&gt;headers-&gt;<span class="tk-fn">first</span><span class="tk-p">(</span><span class="tk-string">&#039;X-Forwarded-For&#039;</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;local&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$throttle</span>-&gt;<span class="tk-fn">tooManyAttempts</span><span class="tk-p">(</span><span class="tk-var">$key</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// bool</span>
+<span class="tk-var">$throttle</span>-&gt;<span class="tk-fn">attempts</span><span class="tk-p">(</span><span class="tk-var">$key</span><span class="tk-p">)</span><span class="tk-p">;</span>          <span class="tk-comment">// int, within the window</span>
+<span class="tk-var">$throttle</span>-&gt;<span class="tk-fn">retryAfter</span><span class="tk-p">(</span><span class="tk-var">$key</span><span class="tk-p">)</span><span class="tk-p">;</span>        <span class="tk-comment">// seconds until the window clears</span>
+<span class="tk-var">$throttle</span>-&gt;<span class="tk-fn">record</span><span class="tk-p">(</span><span class="tk-var">$key</span><span class="tk-p">)</span><span class="tk-p">;</span>            <span class="tk-comment">// after a failure</span>
+<span class="tk-var">$throttle</span>-&gt;<span class="tk-fn">clear</span><span class="tk-p">(</span><span class="tk-var">$key</span><span class="tk-p">)</span><span class="tk-p">;</span>             <span class="tk-comment">// after a success</span>
+<span class="tk-var">$throttle</span>-&gt;<span class="tk-fn">purge</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                 <span class="tk-comment">// housekeeping, for cron</span></code></pre></figure>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-var">LOGIN_MAX_ATTEMPTS</span><span class="tk-p">=</span><span class="tk-string">5</span>
+<span class="tk-var">LOGIN_WINDOW_SECONDS</span><span class="tk-p">=</span><span class="tk-string">900</span></code></pre></figure>
+
+<div class="note">
+<b>Keyed on email and client address together</b>
+<p>Keying on the address alone would let one attacker lock out an office behind a shared IP. Keying on the email alone lets an attacker lock a victim out of their own account deliberately. Both together throttles the actual attack without offering a denial-of-service lever, and the key is stored hashed so the attempts table is not itself a list of accounts to target.</p>
+</div>
+
+<h2>Wiring it up</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-class">Application</span>::<span class="tk-fn">boot</span><span class="tk-p">(</span><span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-p">(</span><span class="tk-class">Blueprint</span> <span class="tk-var">$app</span><span class="tk-p">)</span> <span class="tk-keyword">use</span> <span class="tk-p">(</span><span class="tk-var">$env</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span> <span class="tk-p">{</span>
+    <span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">singleton</span><span class="tk-p">(</span><span class="tk-class">PasswordHasher</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">PasswordHasher</span> =&gt; <span class="tk-keyword">new</span> <span class="tk-fn">PasswordHasher</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">singleton</span><span class="tk-p">(</span>
+        <span class="tk-class">UserProvider</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span>
+        <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-class">Container</span> <span class="tk-var">$c</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">UserProvider</span> =&gt; <span class="tk-keyword">new</span> <span class="tk-fn">DatabaseUserProvider</span><span class="tk-p">(</span><span class="tk-var">$c</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-class">Connection</span>::<span class="tk-keyword">class</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-comment">// Scoped: it reads the session, which belongs to this request.</span>
+    <span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">scoped</span><span class="tk-p">(</span>
+        <span class="tk-class">Authenticator</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span>
+        <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-class">RequestScope</span> <span class="tk-var">$scope</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Authenticator</span> =&gt; <span class="tk-keyword">new</span> <span class="tk-fn">Authenticator</span><span class="tk-p">(</span>
+            <span class="tk-var">$scope</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-class">Session</span>::<span class="tk-keyword">class</span><span class="tk-p">)</span><span class="tk-p">,</span>
+            <span class="tk-var">$scope</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-class">UserProvider</span>::<span class="tk-keyword">class</span><span class="tk-p">)</span><span class="tk-p">,</span>
+            <span class="tk-var">$scope</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-class">PasswordHasher</span>::<span class="tk-keyword">class</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>In templates</h2>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>@if($currentUser !== null)
+    &lt;span&gt;{{ $currentUser-&gt;displayName }}&lt;/span&gt;
+    &lt;form method=&quot;post&quot; action=&quot;/logout&quot;&gt;
+        &lt;input type=&quot;hidden&quot; name=&quot;_token&quot; value=&quot;{{ $csrfToken }}&quot;&gt;
+        &lt;button type=&quot;submit&quot;&gt;Sign out&lt;/button&gt;
+    &lt;/form&gt;
+@else
+    &lt;a href=&quot;/login&quot;&gt;Sign in&lt;/a&gt;
+@endif</code></pre></figure>
+
+<p>Sign-out is a <code>POST</code>, not a link — a <code>GET</code> logout can be triggered by any image tag on any page.</p>
+
+<h2>Not included</h2>
+
+<p>Registration, password reset and email are yours to write; they need decisions about verification and delivery that a framework should not make for you. The pieces above are what they build on: hash with <code>PasswordHasher</code>, store through your provider, and call <code>login()</code> when the user is confirmed.</p>
+    </article>
+    <nav class="pager"><a href="sessions.html"><span>Previous</span>Sessions</a><a class="next" href="validation.html"><span>Next</span>Validation</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

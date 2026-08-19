@@ -1,0 +1,7 @@
+/vendor/
+/.env
+/storage/
+/public/avatars/*
+!/public/avatars/.gitkeep
+/.phpunit.cache/
+/.phpstan.cache/

@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validation — phporbit</title>
+<meta name="description" content="Checking form input, collecting errors, and redisplaying a form without losing what the user typed.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html" class="current" aria-current="page">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Validation</h1>
+        <p class="summary">Checking form input, collecting errors, and redisplaying a form without losing what the user typed.</p>
+        <p><code>Validator</code> is a small chainable checker over string form fields. It collects the first error per field rather than throwing, because a form with three problems should show three problems.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Validation\Validator</span><span class="tk-p">;</span>
+
+<span class="tk-var">$validator</span> <span class="tk-p">=</span> <span class="tk-class">Validator</span>::<span class="tk-fn">forRequest</span><span class="tk-p">(</span><span class="tk-var">$request</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">maxLength</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">,</span> <span class="tk-num">120</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-string">&#039;email&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">email</span><span class="tk-p">(</span><span class="tk-string">&#039;email&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">integer</span><span class="tk-p">(</span><span class="tk-string">&#039;quantity&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">in</span><span class="tk-p">(</span><span class="tk-string">&#039;visibility&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;public&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;unlisted&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$validator</span>-&gt;<span class="tk-fn">fails</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-comment">// ...</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<h2>Rules</h2>
+
+<div class="scroller">
+<table>
+<thead><tr><th>Rule</th><th>Passes when</th></tr></thead>
+<tbody>
+<tr><td><code>required($field)</code></td><td>Present and not blank after trimming.</td></tr>
+<tr><td><code>minLength($field, $min)</code></td><td>At least <code>$min</code> characters.</td></tr>
+<tr><td><code>maxLength($field, $max)</code></td><td>At most <code>$max</code> characters.</td></tr>
+<tr><td><code>integer($field)</code></td><td>Digits, optionally signed.</td></tr>
+<tr><td><code>email($field)</code></td><td>Passes <code>FILTER_VALIDATE_EMAIL</code>.</td></tr>
+<tr><td><code>in($field, $allowed)</code></td><td>Exactly matches one of the allowed values.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Length is counted in characters, not bytes, so an accented name is not rejected for being &ldquo;too long&rdquo;.</p>
+
+<div class="note">
+<b>Absent fields skip non-required rules</b>
+<p>Only <code>required()</code> complains about a missing field. That way an optional field with a <code>maxLength()</code> does not produce a spurious error when it is simply not filled in — state both rules when you want both.</p>
+</div>
+
+<h2>Results</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$validator</span>-&gt;<span class="tk-fn">passes</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>              <span class="tk-comment">// bool</span>
+<span class="tk-var">$validator</span>-&gt;<span class="tk-fn">fails</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>               <span class="tk-comment">// bool</span>
+<span class="tk-var">$validator</span>-&gt;<span class="tk-fn">error</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>        <span class="tk-comment">// ?string — the first error for one field</span>
+<span class="tk-var">$validator</span>-&gt;<span class="tk-fn">errors</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>              <span class="tk-comment">// array&lt;string, string&gt; — one per failed field</span>
+<span class="tk-var">$validator</span>-&gt;<span class="tk-fn">value</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>        <span class="tk-comment">// ?string — the raw submitted value</span>
+<span class="tk-var">$validator</span>-&gt;<span class="tk-fn">validated</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// string — throws if that field failed</span></code></pre></figure>
+
+<p><code>validated()</code> is the one to use after checking <code>passes()</code>. It returns a plain <code>string</code>, so the rest of your code is not threading <code>?string</code> around:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$validator</span>-&gt;<span class="tk-fn">fails</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;<span class="tk-fn">redisplay</span><span class="tk-p">(</span><span class="tk-var">$validator</span><span class="tk-p">,</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span>
+
+<span class="tk-var">$this</span>-&gt;database-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">insert</span><span class="tk-p">(</span><span class="tk-p">[</span>
+    <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-var">$validator</span>-&gt;<span class="tk-fn">validated</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-string">&#039;body&#039;</span> =&gt; <span class="tk-var">$validator</span>-&gt;<span class="tk-fn">validated</span><span class="tk-p">(</span><span class="tk-string">&#039;body&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+<span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Calling it on a field that failed throws — it is a programming error to use a value you were told was invalid.</p>
+
+<h2>Custom messages</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$validator</span> <span class="tk-p">=</span> <span class="tk-class">Validator</span>::<span class="tk-fn">forRequest</span><span class="tk-p">(</span><span class="tk-var">$request</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;Give your article a title.&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">maxLength</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">,</span> <span class="tk-num">120</span><span class="tk-p">,</span> <span class="tk-string">&#039;Titles are limited to 120 characters.&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Redisplaying a form</h2>
+
+<p>Re-render rather than redirect, so the user keeps what they typed:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$validator</span>-&gt;<span class="tk-fn">fails</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;articles/new&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+        <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-string">&#039;New article&#039;</span><span class="tk-p">,</span>
+        <span class="tk-string">&#039;errors&#039;</span> =&gt; <span class="tk-var">$validator</span>-&gt;<span class="tk-fn">errors</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-string">&#039;old&#039;</span> =&gt; <span class="tk-var">$request</span>-&gt;<span class="tk-fn">formData</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-p">]</span><span class="tk-p">,</span> <span class="tk-class">Status</span>::<span class="tk-class">UnprocessableEntity</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>&lt;form method=&quot;post&quot; action=&quot;/articles&quot;&gt;
+    &lt;input type=&quot;hidden&quot; name=&quot;_token&quot; value=&quot;{{ $csrfToken }}&quot;&gt;
+
+    &lt;label for=&quot;title&quot;&gt;Title&lt;/label&gt;
+    &lt;input id=&quot;title&quot; name=&quot;title&quot; value=&quot;{{ $old[&#039;title&#039;] ?? &#039;&#039; }}&quot;
+           @if(isset($errors[&#039;title&#039;])) aria-invalid=&quot;true&quot; aria-describedby=&quot;title-error&quot; @endif&gt;
+
+    @if(isset($errors[&#039;title&#039;]))
+        &lt;p class=&quot;error&quot; id=&quot;title-error&quot;&gt;{{ $errors[&#039;title&#039;] }}&lt;/p&gt;
+    @endif
+
+    &lt;button type=&quot;submit&quot;&gt;Publish&lt;/button&gt;
+&lt;/form&gt;</code></pre></figure>
+
+<p><code>422 Unprocessable Entity</code> is the honest status: the request was well-formed but the contents were not acceptable.</p>
+
+<h2>Checks the validator does not do</h2>
+
+<p>Rules that need the database — uniqueness, existence, ownership — belong in the controller, where the query is visible:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$validator</span>-&gt;<span class="tk-fn">passes</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-var">$taken</span> <span class="tk-p">=</span> <span class="tk-var">$this</span>-&gt;database-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;users&#039;</span><span class="tk-p">)</span>
+        -&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;email&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> <span class="tk-var">$validator</span>-&gt;<span class="tk-fn">validated</span><span class="tk-p">(</span><span class="tk-string">&#039;email&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span>
+        -&gt;<span class="tk-fn">exists</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$taken</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+        <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;<span class="tk-fn">redisplay</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;email&#039;</span> =&gt; <span class="tk-string">&#039;That address is already registered.&#039;</span><span class="tk-p">]</span><span class="tk-p">,</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<div class="warn">
+<b>Careful with what that reveals</b>
+<p>&ldquo;Already registered&rdquo; on a public sign-up form tells an attacker which addresses have accounts. If that matters for your application, accept the registration and send an email that either welcomes them or says an account already exists.</p>
+</div>
+
+<h2>Validating an upload</h2>
+
+<p>Uploads are not form fields; check them separately, and always by content:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$avatar</span> <span class="tk-p">=</span> <span class="tk-var">$request</span>-&gt;<span class="tk-fn">file</span><span class="tk-p">(</span><span class="tk-string">&#039;avatar&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$avatar</span> === <span class="tk-keyword">null</span> || <span class="tk-p">!</span><span class="tk-var">$avatar</span>-&gt;<span class="tk-fn">isValid</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-var">$errors</span><span class="tk-p">[</span><span class="tk-string">&#039;avatar&#039;</span><span class="tk-p">]</span> <span class="tk-p">=</span> <span class="tk-var">$avatar</span>?-&gt;error-&gt;<span class="tk-fn">message</span><span class="tk-p">(</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;Choose a file.&#039;</span><span class="tk-p">;</span>
+<span class="tk-p">}</span> <span class="tk-keyword">elseif</span> <span class="tk-p">(</span><span class="tk-p">!</span><span class="tk-var">$avatar</span>-&gt;<span class="tk-fn">hasTypeIn</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;image/png&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;image/jpeg&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;image/webp&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-var">$errors</span><span class="tk-p">[</span><span class="tk-string">&#039;avatar&#039;</span><span class="tk-p">]</span> <span class="tk-p">=</span> <span class="tk-string">&#039;That is not a PNG, JPEG or WebP image.&#039;</span><span class="tk-p">;</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p><a href="uploads.html">Uploads &rarr;</a></p>
+
+<h2>Beyond these rules</h2>
+
+<p>The rule set is deliberately small — enough for a form, not a schema language. For anything richer, validate in a dedicated class and return your own error array; nothing in the framework requires <code>Validator</code>:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">ArticleInput</span>
+<span class="tk-p">{</span>
+    <span class="tk-comment">/** @return array&lt;string, string&gt; field =&gt; message */</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">check</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> array <span class="tk-p">{</span> <span class="tk-comment">/* … */</span> <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+    </article>
+    <nav class="pager"><a href="auth.html"><span>Previous</span>Authentication</a><a class="next" href="uploads.html"><span>Next</span>File uploads</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Migrations — phporbit</title>
+<meta name="description" content="Versioned schema changes, batches, rollbacks, and why down() is not optional.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html" class="current" aria-current="page">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Migrations</h1>
+        <p class="summary">Versioned schema changes, batches, rollbacks, and why down() is not optional.</p>
+        <p>Migrations live in <code>database/migrations/</code>. Each file returns a <code>Migration</code>:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// database/migrations/0003_create_articles.php</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Connection</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Migration</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">return</span> <span class="tk-keyword">new</span> <span class="tk-keyword">class</span> <span class="tk-keyword">implements</span> <span class="tk-class">Migration</span> <span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">up</span><span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span>
+            <span class="tk-string">&#039;CREATE TABLE articles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                author_id INTEGER NOT NULL REFERENCES users(id),
+                created_at TEXT NOT NULL
+            )&#039;</span><span class="tk-p">,</span>
+        <span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-string">&#039;CREATE INDEX articles_author ON articles(author_id)&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">down</span><span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-string">&#039;DROP TABLE articles&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Naming</h2>
+
+<p><code>&lt;digits&gt;_&lt;lowercase_words&gt;.php</code> — for example <code>0003_create_articles.php</code> or <code>20260810143000_add_articles_slug.php</code>.</p>
+
+<p>Ordering is by filename, so two developers adding migrations on separate branches get a deterministic order once merged, rather than one that depends on class discovery. A timestamp prefix makes collisions unlikely; a counter is fine for a small team.</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>MigrationFailed: Migration file &quot;AddArticles&quot; is unusable: names must look like
+  &quot;0001_create_users&quot; — digits, an underscore, then lowercase words</code></pre></figure>
+
+<h2>Running them</h2>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit migrate
+Applying pending migrations...
+  0003_create_articles
+  0004_add_articles_slug
+
+<span class="tk-p">$ </span>./orbit migrate:status
+  applied   0001_create_users            batch 1
+  applied   0002_create_auth_attempts    batch 1
+  applied   0003_create_articles         batch 2
+  pending   0004_add_articles_slug
+
+<span class="tk-p">$ </span>./orbit migrate:rollback
+Reversed 0003_create_articles
+
+<span class="tk-p">$ </span>./orbit migrate:rollback --batches=2</code></pre></figure>
+
+<p><code>./orbit serve</code> applies pending migrations first, as a development convenience. <strong>The production entrypoints never touch the schema</strong> — several workers booting at once would race. Run <code>./orbit migrate</code> as a deploy step.</p>
+
+<h2>Batches</h2>
+
+<p>Everything applied by one <code>migrate</code> run shares a batch number. A rollback reverses the most recent batch — one deployment's worth of changes — rather than one arbitrary step.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$migrator</span>-&gt;<span class="tk-fn">batches</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// [&#039;0001_create_users&#039; =&gt; 1, &#039;0003_create_articles&#039; =&gt; 2]</span></code></pre></figure>
+
+<p>Every migration in the batch is loaded and checked <em>before</em> anything is undone, so a batch containing a missing file fails without having half-rolled-back the rest.</p>
+
+<h2>Transactions</h2>
+
+<p>Each migration runs inside its own transaction. A failure leaves the schema as it was and the ledger unchanged, and stops the run — later migrations almost certainly assume this one's changes exist.</p>
+
+<div class="warn">
+<b>This depends on your engine</b>
+<p>SQLite and PostgreSQL support transactional DDL, so the guarantee holds. <strong>MySQL does not</strong>: a failed migration there can leave partial changes behind, and you will need to clean up by hand. Keep MySQL migrations small for that reason.</p>
+</div>
+
+<h2>down() is required</h2>
+
+<p>The interface demands it, so writing a migration forces a moment's thought about undoing it. When a change genuinely cannot be reversed, say so:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\IrreversibleMigration</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">return</span> <span class="tk-keyword">new</span> <span class="tk-keyword">class</span> <span class="tk-keyword">implements</span> <span class="tk-class">Migration</span> <span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">up</span><span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-string">&#039;ALTER TABLE users DROP COLUMN legacy_token&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">down</span><span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">throw</span> <span class="tk-class">IrreversibleMigration</span>::<span class="tk-fn">because</span><span class="tk-p">(</span><span class="tk-string">&#039;the legacy_token values were not retained.&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>That records the decision in the migration itself, instead of an empty method that silently &ldquo;succeeds&rdquo; and leaves the schema wrong.</p>
+
+<h2>Data migrations</h2>
+
+<p>Schema and data change together in one transaction:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">up</span><span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+<span class="tk-p">{</span>
+    <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-string">&#039;ALTER TABLE users ADD COLUMN display_name TEXT&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-keyword">foreach</span> <span class="tk-p">(</span><span class="tk-var">$database</span>-&gt;<span class="tk-fn">select</span><span class="tk-p">(</span><span class="tk-string">&#039;SELECT id, email FROM users&#039;</span><span class="tk-p">)</span> <span class="tk-keyword">as</span> <span class="tk-var">$user</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">execute</span><span class="tk-p">(</span>
+            <span class="tk-string">&#039;UPDATE users SET display_name = :name WHERE id = :id&#039;</span><span class="tk-p">,</span>
+            <span class="tk-p">[</span>
+                <span class="tk-string">&#039;name&#039;</span> =&gt; <span class="tk-fn">explode</span><span class="tk-p">(</span><span class="tk-string">&#039;@&#039;</span><span class="tk-p">,</span> (string) <span class="tk-var">$user</span><span class="tk-p">[</span><span class="tk-string">&#039;email&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">[</span><span class="tk-num">0</span><span class="tk-p">]</span><span class="tk-p">,</span>
+                <span class="tk-string">&#039;id&#039;</span> =&gt; <span class="tk-var">$user</span><span class="tk-p">[</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">]</span><span class="tk-p">,</span>
+            <span class="tk-p">]</span><span class="tk-p">,</span>
+        <span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p>For a large table, prefer a single <code>UPDATE</code> over a loop — it is one statement instead of one per row.</p>
+
+<h2>The ledger</h2>
+
+<p>Applied migrations are recorded in <code>orbit_migrations</code>:</p>
+
+<div class="scroller">
+<table>
+<thead><tr><th>Column</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>name</code></td><td>Filename without <code>.php</code>. Primary key.</td></tr>
+<tr><td><code>batch</code></td><td>Which run applied it.</td></tr>
+<tr><td><code>applied_at</code></td><td>UTC timestamp.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>The table is created on demand, so a fresh database needs no setup step.</p>
+
+<h2>Using the Migrator directly</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Migrator</span><span class="tk-p">;</span>
+
+<span class="tk-var">$migrator</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-fn">Migrator</span><span class="tk-p">(</span>
+    <span class="tk-var">$database</span><span class="tk-p">,</span>
+    <span class="tk-var">$root</span> <span class="tk-p">.</span> <span class="tk-string">&#039;/database/migrations&#039;</span><span class="tk-p">,</span>
+    report<span class="tk-p">:</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-keyword">string</span> <span class="tk-var">$line</span><span class="tk-p">)</span> =&gt; <span class="tk-keyword">print</span><span class="tk-p">(</span><span class="tk-var">$line</span> <span class="tk-p">.</span> <span class="tk-class">PHP_EOL</span><span class="tk-p">)</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$migrator</span>-&gt;<span class="tk-fn">pending</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>     <span class="tk-comment">// list&lt;string&gt;</span>
+<span class="tk-var">$migrator</span>-&gt;<span class="tk-fn">applied</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>     <span class="tk-comment">// list&lt;string&gt;</span>
+<span class="tk-var">$migrator</span>-&gt;<span class="tk-fn">available</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// every file, in run order</span>
+<span class="tk-var">$migrator</span>-&gt;<span class="tk-fn">migrate</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>     <span class="tk-comment">// returns what it applied</span>
+<span class="tk-var">$migrator</span>-&gt;<span class="tk-fn">rollback</span><span class="tk-p">(</span><span class="tk-num">1</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// returns what it reversed</span></code></pre></figure>
+
+<p>This is what makes migrations testable — run them against an in-memory SQLite database in a test and assert the resulting schema.</p>
+
+<h2>Seeding</h2>
+
+<p>Seed data is not a migration. It belongs in <code>./orbit db:seed</code>, which is idempotent and safe to re-run:</p>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit db:seed
+Seeded demo account: demo@example.test / correct-horse-battery</code></pre></figure>
+    </article>
+    <nav class="pager"><a href="queries.html"><span>Previous</span>Query builder</a><a class="next" href="security.html"><span>Next</span>Security</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

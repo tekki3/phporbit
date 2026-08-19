@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>File uploads — phporbit</title>
+<meta name="description" content="Quotas, judging files by their bytes, storing them safely, and the cleanup contract.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html" class="current" aria-current="page">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>File uploads</h1>
+        <p class="summary">Quotas, judging files by their bytes, storing them safely, and the cleanup contract.</p>
+        <div class="warn">
+<b>Three things about an upload are attacker-controlled</b>
+<p>The filename, the declared media type, and the bytes. None may be trusted, and the API is shaped so that trusting them by accident is difficult.</p>
+</div>
+
+<h2>The form</h2>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>&lt;form method=&quot;post&quot; action=&quot;/avatar&quot; enctype=&quot;multipart/form-data&quot;&gt;
+    &lt;input type=&quot;hidden&quot; name=&quot;_token&quot; value=&quot;{{ $csrfToken }}&quot;&gt;
+    &lt;input type=&quot;file&quot; name=&quot;avatar&quot; accept=&quot;image/png,image/jpeg,image/webp&quot;&gt;
+    &lt;button type=&quot;submit&quot;&gt;Upload&lt;/button&gt;
+&lt;/form&gt;</code></pre></figure>
+
+<p><code>enctype="multipart/form-data"</code> is required — without it the browser sends only the filename.</p>
+
+<h2>The handler</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">StoreAvatarController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">private</span> <span class="tk-keyword">const</span> <span class="tk-class">ALLOWED</span> <span class="tk-p">=</span> <span class="tk-p">[</span>
+        <span class="tk-string">&#039;image/png&#039;</span> =&gt; <span class="tk-string">&#039;png&#039;</span><span class="tk-p">,</span>
+        <span class="tk-string">&#039;image/jpeg&#039;</span> =&gt; <span class="tk-string">&#039;jpg&#039;</span><span class="tk-p">,</span>
+        <span class="tk-string">&#039;image/webp&#039;</span> =&gt; <span class="tk-string">&#039;webp&#039;</span><span class="tk-p">,</span>
+    <span class="tk-p">]</span><span class="tk-p">;</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$file</span> <span class="tk-p">=</span> <span class="tk-var">$request</span>-&gt;<span class="tk-fn">file</span><span class="tk-p">(</span><span class="tk-string">&#039;avatar&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$file</span> === <span class="tk-keyword">null</span> || <span class="tk-p">!</span><span class="tk-var">$file</span>-&gt;<span class="tk-fn">isValid</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+            <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;<span class="tk-fn">back</span><span class="tk-p">(</span><span class="tk-var">$file</span>?-&gt;error-&gt;<span class="tk-fn">message</span><span class="tk-p">(</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;Choose a file.&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-p">}</span>
+
+        <span class="tk-comment">// Judged by contents, never by name or declared type.</span>
+        <span class="tk-var">$extension</span> <span class="tk-p">=</span> <span class="tk-var">$file</span>-&gt;<span class="tk-fn">extensionFromContents</span><span class="tk-p">(</span><span class="tk-keyword">self</span>::<span class="tk-class">ALLOWED</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$extension</span> === <span class="tk-keyword">null</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+            <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;<span class="tk-fn">back</span><span class="tk-p">(</span><span class="tk-string">&#039;That is not a PNG, JPEG or WebP image.&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-p">}</span>
+
+        <span class="tk-comment">// A name you generate — not one the client chose.</span>
+        <span class="tk-var">$file</span>-&gt;<span class="tk-fn">moveTo</span><span class="tk-p">(</span><span class="tk-var">$this</span>-&gt;directory<span class="tk-p">,</span> <span class="tk-fn">sprintf</span><span class="tk-p">(</span><span class="tk-string">&#039;user-%d.%s&#039;</span><span class="tk-p">,</span> <span class="tk-var">$userId</span><span class="tk-p">,</span> <span class="tk-var">$extension</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">redirect</span><span class="tk-p">(</span><span class="tk-string">&#039;/avatar&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<h2>Quotas are required</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Upload\UploadQuotas</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">new</span> <span class="tk-fn">UploadQuotas</span><span class="tk-p">(</span>
+    maxFileBytes<span class="tk-p">:</span> <span class="tk-num">2</span> <span class="tk-p">*</span> <span class="tk-num">1024</span> <span class="tk-p">*</span> <span class="tk-num">1024</span><span class="tk-p">,</span>
+    maxTotalBytes<span class="tk-p">:</span> <span class="tk-num">8</span> <span class="tk-p">*</span> <span class="tk-num">1024</span> <span class="tk-p">*</span> <span class="tk-num">1024</span><span class="tk-p">,</span>
+    maxFiles<span class="tk-p">:</span> <span class="tk-num">5</span><span class="tk-p">,</span>
+    maxFieldBytes<span class="tk-p">:</span> <span class="tk-num">64</span> <span class="tk-p">*</span> <span class="tk-num">1024</span><span class="tk-p">,</span>
+    maxParts<span class="tk-p">:</span> <span class="tk-num">50</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-class">UploadQuotas</span>::<span class="tk-fn">permissive</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// 32 MB per file, 64 MB total, 20 files</span></code></pre></figure>
+
+<p>An upload endpoint without quotas is a denial-of-service primitive: anyone can post a body large enough to exhaust disk or memory, and repeat it. Quotas are therefore required to parse at all, and the defaults are small enough to be safe on a machine nobody has tuned.</p>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-var">UPLOAD_MAX_BYTES</span><span class="tk-p">=</span><span class="tk-string">1048576</span></code></pre></figure>
+
+<h2>Judging a file</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$file</span>-&gt;clientFilename<span class="tk-p">;</span>      <span class="tk-comment">// &quot;photo.png&quot;        — what the browser claimed</span>
+<span class="tk-var">$file</span>-&gt;clientMediaType<span class="tk-p">;</span>     <span class="tk-comment">// &quot;image/png&quot;        — what the browser claimed</span>
+<span class="tk-var">$file</span>-&gt;size<span class="tk-p">;</span>                <span class="tk-comment">// bytes actually received</span>
+<span class="tk-var">$file</span>-&gt;error<span class="tk-p">;</span>               <span class="tk-comment">// UploadError enum</span>
+
+<span class="tk-var">$file</span>-&gt;<span class="tk-fn">detectedType</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>      <span class="tk-comment">// &quot;image/png&quot; — sniffed from the bytes. Use this.</span>
+<span class="tk-var">$file</span>-&gt;<span class="tk-fn">hasTypeIn</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;image/png&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;image/jpeg&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$file</span>-&gt;<span class="tk-fn">extensionFromContents</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;image/png&#039;</span> =&gt; <span class="tk-string">&#039;png&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<div class="good">
+<b>Only <code>detectedType()</code> should gate a decision</b>
+<p>A file named <code>avatar.png</code> and declared <code>image/png</code> can still be a PHP script. <code>detectedType()</code> inspects the actual bytes with <code>finfo</code>; the filename and declared type are recorded for display and nothing else.</p>
+</div>
+
+<h2>Errors are values, not exceptions</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Upload\UploadError</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">match</span> <span class="tk-p">(</span><span class="tk-var">$file</span>-&gt;error<span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-class">UploadError</span>::<span class="tk-class">None</span> =&gt; <span class="tk-keyword">null</span><span class="tk-p">,</span>
+    <span class="tk-class">UploadError</span>::<span class="tk-class">NoFile</span> =&gt; <span class="tk-string">&#039;No file was selected.&#039;</span><span class="tk-p">,</span>
+    <span class="tk-class">UploadError</span>::<span class="tk-class">TooLarge</span> =&gt; <span class="tk-string">&#039;The file is larger than this endpoint accepts.&#039;</span><span class="tk-p">,</span>
+    <span class="tk-class">UploadError</span>::<span class="tk-class">Partial</span> =&gt; <span class="tk-string">&#039;The upload was interrupted before it finished.&#039;</span><span class="tk-p">,</span>
+    <span class="tk-class">UploadError</span>::<span class="tk-class">TooMany</span> =&gt; <span class="tk-string">&#039;Too many files were sent at once.&#039;</span><span class="tk-p">,</span>
+    <span class="tk-class">UploadError</span>::<span class="tk-class">CannotWrite</span> =&gt; <span class="tk-string">&#039;The server could not store the upload.&#039;</span><span class="tk-p">,</span>
+<span class="tk-p">}</span><span class="tk-p">;</span>
+
+<span class="tk-var">$file</span>-&gt;error-&gt;<span class="tk-fn">message</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// the same text, ready to show</span></code></pre></figure>
+
+<p>A user picking a file that is too large is ordinary form input, so the handler shows a message rather than catching a throwable.</p>
+
+<h2>Storing</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$path</span> <span class="tk-p">=</span> <span class="tk-var">$file</span>-&gt;<span class="tk-fn">moveTo</span><span class="tk-p">(</span><span class="tk-var">$directory</span><span class="tk-p">,</span> <span class="tk-string">&#039;user-42.png&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p><code>moveTo()</code> refuses a name containing a path separator rather than quietly reducing it, refuses hidden names beginning with a dot, and confirms the resolved destination is a direct child of the directory it was given. Files are stored at mode <code>0640</code> — uploads are data, never programs.</p>
+
+<p>If you must use the client's name, launder it first:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$file</span>-&gt;<span class="tk-fn">safeName</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>               <span class="tk-comment">// &quot;my-holiday-photo.png&quot;</span>
+<span class="tk-var">$file</span>-&gt;<span class="tk-fn">safeName</span><span class="tk-p">(</span><span class="tk-string">&#039;attachment&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// fallback when nothing usable survives</span></code></pre></figure>
+
+<p>It strips directories and backslashes, collapses everything outside <code>[A-Za-z0-9._-]</code>, and refuses a leading dot so an upload cannot become <code>.htaccess</code>. It is still not a substitute for generating your own name — two users can upload <code>photo.png</code>.</p>
+
+<h2>Reading without storing</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$csv</span> <span class="tk-p">=</span> <span class="tk-var">$file</span>-&gt;<span class="tk-fn">contents</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// throws if invalid or already moved</span></code></pre></figure>
+
+<h2>The cleanup contract</h2>
+
+<div class="note">
+<b>Temporary files are discarded for you</b>
+<p>The kernel schedules cleanup when the request scope opens, so any upload not moved is deleted when the request ends — including when the handler throws. An application that forgot to register an upload-handling layer does not slowly fill its temp directory.</p>
+</div>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$file</span>-&gt;<span class="tk-fn">wasMoved</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// true once moveTo() succeeded; discard() then does nothing</span>
+<span class="tk-var">$file</span>-&gt;<span class="tk-fn">discard</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// explicit early cleanup, safe to call twice</span></code></pre></figure>
+
+<p>The one case where you own it: if you construct a <code>MultipartParser</code> yourself, outside an <code>Application</code>, nothing schedules the cleanup and you must call <code>discard()</code>.</p>
+
+<h2>Where to put the files</h2>
+
+<div class="warn">
+<b>Not in the document root</b>
+<p>A file under <code>public/</code> is served by nginx or Apache directly, and whether it executes depends on their configuration rather than yours. Store uploads outside the web root and serve them through a route that checks permissions and sets the type.</p>
+</div>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/avatars/{id:\d+}&#039;</span><span class="tk-p">,</span> <span class="tk-class">ServeAvatarController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;avatars.show&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">make</span><span class="tk-p">(</span><span class="tk-class">Status</span>::<span class="tk-class">Ok</span><span class="tk-p">,</span> (string) <span class="tk-fn">file_get_contents</span><span class="tk-p">(</span><span class="tk-var">$path</span><span class="tk-p">)</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">withHeader</span><span class="tk-p">(</span><span class="tk-string">&#039;Content-Type&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;image/png&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">withHeader</span><span class="tk-p">(</span><span class="tk-string">&#039;Content-Disposition&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;inline; filename=&quot;avatar.png&quot;&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">withHeader</span><span class="tk-p">(</span><span class="tk-string">&#039;Cache-Control&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;private, max-age=3600&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>How each target decodes uploads</h2>
+
+<div class="scroller">
+<table>
+<thead><tr><th>Target</th><th>Decoded by</th></tr></thead>
+<tbody>
+<tr><td>nginx+FPM, Apache, FrankenPHP</td><td>PHP itself, into <code>$_FILES</code>; <code>FpmSapi</code> adapts it</td></tr>
+<tr><td><code>./orbit serve</code></td><td><code>MultipartParser</code>, from the body it read</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Both paths converge on the same <code>UploadedFile</code> objects, so your handler is identical. One difference matters: files PHP created are moved with <code>move_uploaded_file()</code>, which additionally verifies the source really was an upload for this request. <code>UploadedFile</code> tracks which kind it holds and picks the right call.</p>
+
+<h2>Two current limits</h2>
+
+<ul>
+<li><strong>Array-style inputs</strong> (<code>name="photos[]"</code>) are not supported. <code>FpmSapi</code> skips them rather than half-supporting PHP's transposed <code>$_FILES</code> arrays. Use distinct field names.</li>
+<li><strong>The built-in server decodes from memory</strong>, which bounds upload size there. That is deliberate for a development server; the production targets stream to disk before PHP sees the request.</li>
+</ul>
+    </article>
+    <nav class="pager"><a href="validation.html"><span>Previous</span>Validation</a><a class="next" href="encryption.html"><span>Next</span>Encryption and signing</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

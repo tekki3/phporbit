@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controllers — phporbit</title>
+<meta name="description" content="Single-action classes, constructor injection, and when a closure is the better answer.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html" class="current" aria-current="page">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Controllers</h1>
+        <p class="summary">Single-action classes, constructor injection, and when a closure is the better answer.</p>
+        <p>A controller is a class implementing <code>Handler</code>. One class, one route.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">namespace</span> <span class="tk-class">App\Controllers</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Response</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\ServerRequest</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Routing\Handler</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">ShowArticleController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">text</span><span class="tk-p">(</span><span class="tk-string">&#039;Article &#039;</span> <span class="tk-p">.</span> <span class="tk-var">$request</span>-&gt;<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles/{id:\d+}&#039;</span><span class="tk-p">,</span> <span class="tk-class">ShowArticleController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-string">&#039;articles.show&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<div class="note">
+<b>Why one action per class</b>
+<p>A <code>[Controller::class, 'method']</code> pair can only be invoked dynamically, and a dynamic call returns <code>mixed</code>. That defeats the type guarantees the rest of the framework depends on. An interface keeps the signature statically checkable, and PHPStan can see that <code>handle()</code> returns a <code>Response</code>.</p>
+<p>In practice a class per action also stops the 800-line controller that accumulates seven unrelated responsibilities.</p>
+</div>
+
+<h2>Dependencies</h2>
+
+<p>Constructor parameters are resolved from the request scope. Nothing to register:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">ListArticlesController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">,</span>      <span class="tk-comment">// boot singleton</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">TemplateEngine</span> <span class="tk-var">$view</span><span class="tk-p">,</span>      <span class="tk-comment">// boot singleton</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Session</span> <span class="tk-var">$session</span><span class="tk-p">,</span>          <span class="tk-comment">// published by middleware</span>
+    <span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$articles</span> <span class="tk-p">=</span> <span class="tk-var">$this</span>-&gt;database-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">orderBy</span><span class="tk-p">(</span><span class="tk-string">&#039;created_at&#039;</span><span class="tk-p">,</span> <span class="tk-class">Direction</span>::<span class="tk-class">Descending</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">limit</span><span class="tk-p">(</span><span class="tk-num">20</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;articles/index&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+            <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-string">&#039;Articles&#039;</span><span class="tk-p">,</span>
+            <span class="tk-string">&#039;articles&#039;</span> =&gt; <span class="tk-var">$articles</span><span class="tk-p">,</span>
+            <span class="tk-string">&#039;notice&#039;</span> =&gt; <span class="tk-var">$this</span>-&gt;session-&gt;<span class="tk-fn">takeFlash</span><span class="tk-p">(</span><span class="tk-string">&#039;notice&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p>Resolution order for each parameter:</p>
+
+<ol>
+<li>Already provided for this request (the session, the matched route, the request scope)?</li>
+<li>Registered as <code>scoped()</code>? Build it, once per request.</li>
+<li>Registered as <code>singleton()</code>? Use the process-wide instance.</li>
+<li>Otherwise autowire it, per request, from its own constructor.</li>
+</ol>
+
+<p>The controller itself is autowired, so it is built fresh per request and may hold state safely for that request's duration.</p>
+
+<h3>What cannot be autowired</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">ReportController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">,</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-keyword">int</span> <span class="tk-var">$pageSize</span><span class="tk-p">,</span>        <span class="tk-comment">// no class type, no default</span>
+    <span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span>
+
+<span class="tk-comment">// CannotAutowire: Cannot resolve &quot;$pageSize&quot; of App\Controllers\ReportController::__construct():</span>
+<span class="tk-comment">//   it has no class type and no default. Register &quot;App\Controllers\ReportController&quot;</span>
+<span class="tk-comment">//   with an explicit factory.</span></code></pre></figure>
+
+<p>Give it a default, or register the class explicitly:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">scoped</span><span class="tk-p">(</span>
+    <span class="tk-class">ReportController</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span>
+    <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-class">RequestScope</span> <span class="tk-var">$scope</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">ReportController</span> =&gt; <span class="tk-keyword">new</span> <span class="tk-fn">ReportController</span><span class="tk-p">(</span>
+        <span class="tk-var">$scope</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-class">Connection</span>::<span class="tk-keyword">class</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        pageSize<span class="tk-p">:</span> <span class="tk-num">50</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Guessing a scalar would silently inject a value nobody chose, so it is refused instead.</p>
+
+<h2>Closures</h2>
+
+<p>Closures receive the request and the scope, and are the right tool when a file would be ceremony:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/health&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span> =&gt; <span class="tk-class">Response</span>::<span class="tk-fn">json</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;status&#039;</span> =&gt; <span class="tk-string">&#039;ok&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$routes</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;/whoami&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">,</span> <span class="tk-class">RequestScope</span> <span class="tk-var">$scope</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span> <span class="tk-p">{</span>
+    <span class="tk-var">$session</span> <span class="tk-p">=</span> <span class="tk-var">$scope</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-class">Session</span>::<span class="tk-keyword">class</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">text</span><span class="tk-p">(</span><span class="tk-var">$session</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;name&#039;</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;guest&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<div class="good">
+<b>Rule of thumb</b>
+<p>Closure if it fits on one line and needs nothing injected. A class the moment it needs a dependency, a template, or a test of its own.</p>
+</div>
+
+<h2>Returning things</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// Rendered HTML</span>
+<span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;articles/show&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;article&#039;</span> =&gt; <span class="tk-var">$article</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// JSON</span>
+<span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">json</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;id&#039;</span> =&gt; <span class="tk-num">42</span><span class="tk-p">,</span> <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-var">$title</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Redirect after a successful write, so a refresh does not repost</span>
+<span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">redirect</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Nothing to say</span>
+<span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">noContent</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// A specific status</span>
+<span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">text</span><span class="tk-p">(</span><span class="tk-string">&#039;Not your article.&#039;</span><span class="tk-p">,</span> <span class="tk-class">Status</span>::<span class="tk-class">Forbidden</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p><a href="responses.html">Full response API &rarr;</a></p>
+
+<h2>A complete example</h2>
+
+<p>Create an article: validate, write, flash, redirect.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">namespace</span> <span class="tk-class">App\Controllers</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Connection</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Response</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\ServerRequest</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Routing\Handler</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Session\Session</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Validation\Validator</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\View\TemplateEngine</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">CreateArticleController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">,</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Session</span> <span class="tk-var">$session</span><span class="tk-p">,</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">TemplateEngine</span> <span class="tk-var">$view</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$validator</span> <span class="tk-p">=</span> <span class="tk-class">Validator</span>::<span class="tk-fn">forRequest</span><span class="tk-p">(</span><span class="tk-var">$request</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">maxLength</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">,</span> <span class="tk-num">120</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">required</span><span class="tk-p">(</span><span class="tk-string">&#039;body&#039;</span><span class="tk-p">)</span>
+            -&gt;<span class="tk-fn">maxLength</span><span class="tk-p">(</span><span class="tk-string">&#039;body&#039;</span><span class="tk-p">,</span> <span class="tk-num">5000</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$validator</span>-&gt;<span class="tk-fn">fails</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+            <span class="tk-comment">// Re-render with the errors rather than redirecting, so the user</span>
+            <span class="tk-comment">// keeps what they typed.</span>
+            <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;articles/new&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+                <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-string">&#039;New article&#039;</span><span class="tk-p">,</span>
+                <span class="tk-string">&#039;errors&#039;</span> =&gt; <span class="tk-var">$validator</span>-&gt;<span class="tk-fn">errors</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+                <span class="tk-string">&#039;old&#039;</span> =&gt; <span class="tk-var">$request</span>-&gt;<span class="tk-fn">formData</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+            <span class="tk-p">]</span><span class="tk-p">,</span> <span class="tk-class">Status</span>::<span class="tk-class">UnprocessableEntity</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-p">}</span>
+
+        <span class="tk-var">$this</span>-&gt;database-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">insert</span><span class="tk-p">(</span><span class="tk-p">[</span>
+            <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-var">$validator</span>-&gt;<span class="tk-fn">validated</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+            <span class="tk-string">&#039;body&#039;</span> =&gt; <span class="tk-var">$validator</span>-&gt;<span class="tk-fn">validated</span><span class="tk-p">(</span><span class="tk-string">&#039;body&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+            <span class="tk-string">&#039;created_at&#039;</span> =&gt; <span class="tk-fn">gmdate</span><span class="tk-p">(</span><span class="tk-string">&#039;c&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-var">$this</span>-&gt;session-&gt;<span class="tk-fn">flash</span><span class="tk-p">(</span><span class="tk-string">&#039;notice&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;Article published.&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">redirect</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p>CSRF is already enforced for this <code>POST</code> — nothing in the controller asks for it. <a href="security.html">Why &rarr;</a></p>
+    </article>
+    <nav class="pager"><a href="routing.html"><span>Previous</span>Routing</a><a class="next" href="requests.html"><span>Next</span>Requests</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

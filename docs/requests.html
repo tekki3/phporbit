@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Requests — phporbit</title>
+<meta name="description" content="Reading the method, URL, query string, headers, cookies, form fields and uploads.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html" class="current" aria-current="page">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Requests</h1>
+        <p class="summary">Reading the method, URL, query string, headers, cookies, form fields and uploads.</p>
+        <p><code>ServerRequest</code> is an immutable value object, fully detached from the SAPI that produced it. Every field is materialised by the adapter, so the same object is built identically under all four targets — and no code above the adapter ever reads a superglobal.</p>
+
+<h2>At a glance</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+<span class="tk-p">{</span>
+    <span class="tk-var">$request</span>-&gt;method<span class="tk-p">;</span>                     <span class="tk-comment">// Method enum</span>
+    <span class="tk-var">$request</span>-&gt;uri-&gt;path<span class="tk-p">;</span>                  <span class="tk-comment">// &quot;/articles/42&quot;</span>
+    <span class="tk-var">$request</span>-&gt;uri-&gt;<span class="tk-fn">queryParam</span><span class="tk-p">(</span><span class="tk-string">&#039;page&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// &quot;2&quot; | null</span>
+    <span class="tk-var">$request</span>-&gt;headers-&gt;<span class="tk-fn">first</span><span class="tk-p">(</span><span class="tk-string">&#039;Accept&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// &quot;text/html&quot; | null</span>
+    <span class="tk-var">$request</span>-&gt;<span class="tk-fn">cookie</span><span class="tk-p">(</span><span class="tk-string">&#039;theme&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>            <span class="tk-comment">// &quot;dark&quot; | null</span>
+    <span class="tk-var">$request</span>-&gt;<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>            <span class="tk-comment">// route parameter</span>
+    <span class="tk-var">$request</span>-&gt;<span class="tk-fn">form</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>              <span class="tk-comment">// POST field</span>
+    <span class="tk-var">$request</span>-&gt;<span class="tk-fn">file</span><span class="tk-p">(</span><span class="tk-string">&#039;avatar&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>             <span class="tk-comment">// UploadedFile | null</span>
+    <span class="tk-var">$request</span>-&gt;body<span class="tk-p">;</span>                       <span class="tk-comment">// raw body, for JSON and webhooks</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<h2>Method</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Method</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$request</span>-&gt;method === <span class="tk-class">Method</span>::<span class="tk-class">Post</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-comment">// ...</span>
+<span class="tk-p">}</span>
+
+<span class="tk-comment">// Safe methods are exempt from CSRF; this is what decides that.</span>
+<span class="tk-var">$request</span>-&gt;method-&gt;<span class="tk-fn">isStateChanging</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// false for GET, HEAD, OPTIONS</span></code></pre></figure>
+
+<h2>URL</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$uri</span> <span class="tk-p">=</span> <span class="tk-var">$request</span>-&gt;uri<span class="tk-p">;</span>
+
+<span class="tk-var">$uri</span>-&gt;scheme<span class="tk-p">;</span>                  <span class="tk-comment">// &quot;https&quot;</span>
+<span class="tk-var">$uri</span>-&gt;host<span class="tk-p">;</span>                    <span class="tk-comment">// &quot;example.test&quot;</span>
+<span class="tk-var">$uri</span>-&gt;port<span class="tk-p">;</span>                    <span class="tk-comment">// 443</span>
+<span class="tk-var">$uri</span>-&gt;path<span class="tk-p">;</span>                    <span class="tk-comment">// &quot;/search&quot;   (decoded, dot segments resolved)</span>
+<span class="tk-var">$uri</span>-&gt;<span class="tk-fn">isSecure</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>              <span class="tk-comment">// true</span>
+<span class="tk-var">$uri</span>-&gt;<span class="tk-fn">authority</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>             <span class="tk-comment">// &quot;example.test&quot;  (default port omitted)</span>
+(string) <span class="tk-var">$uri</span><span class="tk-p">;</span>                 <span class="tk-comment">// &quot;https://example.test/search?q=cats&quot;</span>
+
+<span class="tk-var">$uri</span>-&gt;<span class="tk-fn">queryParam</span><span class="tk-p">(</span><span class="tk-string">&#039;q&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>         <span class="tk-comment">// &quot;cats&quot; | null</span>
+<span class="tk-var">$uri</span>-&gt;<span class="tk-fn">queryParams</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>           <span class="tk-comment">// [&#039;q&#039; =&gt; &#039;cats&#039;, &#039;page&#039; =&gt; &#039;2&#039;]</span></code></pre></figure>
+
+<div class="note">
+<b>The path is already safe</b>
+<p><code>Uri</code> splits on <code>/</code> <em>before</em> percent-decoding, so an encoded separator can never introduce a segment, and it matches dot segments <em>after</em> decoding, so <code>%2E%2E</code> is caught as traversal. Encoded separators are rejected outright, and a path climbing above the root is refused rather than clamped. By the time your handler sees <code>$uri-&gt;path</code>, those attacks are already 400s.</p>
+</div>
+
+<h2>Headers</h2>
+
+<p>Lookup is case-insensitive; the original casing is preserved for the wire.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$headers</span> <span class="tk-p">=</span> <span class="tk-var">$request</span>-&gt;headers<span class="tk-p">;</span>
+
+<span class="tk-var">$headers</span>-&gt;<span class="tk-fn">has</span><span class="tk-p">(</span><span class="tk-string">&#039;authorization&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>            <span class="tk-comment">// true</span>
+<span class="tk-var">$headers</span>-&gt;<span class="tk-fn">first</span><span class="tk-p">(</span><span class="tk-string">&#039;Content-Type&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>           <span class="tk-comment">// &quot;application/json&quot; | null</span>
+<span class="tk-var">$headers</span>-&gt;<span class="tk-fn">all</span><span class="tk-p">(</span><span class="tk-string">&#039;Accept-Encoding&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>          <span class="tk-comment">// [&#039;gzip&#039;, &#039;br&#039;]</span>
+<span class="tk-var">$headers</span>-&gt;<span class="tk-fn">toWire</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                        <span class="tk-comment">// [[&#039;Accept&#039;, &#039;text/html&#039;], ...]</span>
+
+<span class="tk-comment">// Immutable — these return copies</span>
+<span class="tk-var">$headers</span>-&gt;<span class="tk-fn">with</span><span class="tk-p">(</span><span class="tk-string">&#039;X-Trace&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;abc&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>          <span class="tk-comment">// replaces</span>
+<span class="tk-var">$headers</span>-&gt;<span class="tk-fn">add</span><span class="tk-p">(</span><span class="tk-string">&#039;X-Trace&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;def&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>           <span class="tk-comment">// appends</span>
+<span class="tk-var">$headers</span>-&gt;<span class="tk-fn">without</span><span class="tk-p">(</span><span class="tk-string">&#039;Cookie&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Header names and values are validated on construction: a CR, LF or NUL is rejected rather than stripped, so response splitting is not possible through a value that came from a request.</p>
+
+<h2>Query string versus form fields</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// GET /search?q=cats</span>
+<span class="tk-var">$request</span>-&gt;uri-&gt;<span class="tk-fn">queryParam</span><span class="tk-p">(</span><span class="tk-string">&#039;q&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// &quot;cats&quot;</span>
+
+<span class="tk-comment">// POST with application/x-www-form-urlencoded</span>
+<span class="tk-var">$request</span>-&gt;<span class="tk-fn">form</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>          <span class="tk-comment">// &quot;Hello&quot;</span>
+<span class="tk-var">$request</span>-&gt;<span class="tk-fn">formData</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>             <span class="tk-comment">// [&#039;title&#039; =&gt; &#039;Hello&#039;, &#039;_token&#039; =&gt; &#039;...&#039;]</span></code></pre></figure>
+
+<p>Form decoding happens in the SAPI adapter while the request is built, so the value object stays immutable with no lazy parsing hidden inside it.</p>
+
+<div class="warn">
+<b>Nested inputs are dropped</b>
+<p><code>a[b]=1</code> decodes to an array, and this API is string-typed throughout. Nested structures are dropped rather than flattened into something ambiguous. For structured input, post JSON and decode <code>$request-&gt;body</code> yourself.</p>
+</div>
+
+<h2>JSON bodies</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$payload</span> <span class="tk-p">=</span> <span class="tk-fn">json_decode</span><span class="tk-p">(</span><span class="tk-var">$request</span>-&gt;body<span class="tk-p">,</span> <span class="tk-keyword">true</span><span class="tk-p">,</span> <span class="tk-num">512</span><span class="tk-p">,</span> <span class="tk-class">JSON_THROW_ON_ERROR</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-p">!</span><span class="tk-fn">is_array</span><span class="tk-p">(</span><span class="tk-var">$payload</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">json</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;error&#039;</span> =&gt; <span class="tk-string">&#039;Expected an object.&#039;</span><span class="tk-p">]</span><span class="tk-p">,</span> <span class="tk-class">Status</span>::<span class="tk-class">BadRequest</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span>
+
+<span class="tk-var">$title</span> <span class="tk-p">=</span> <span class="tk-fn">is_string</span><span class="tk-p">(</span><span class="tk-var">$payload</span><span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">]</span> ?? <span class="tk-keyword">null</span><span class="tk-p">)</span> <span class="tk-p">?</span> <span class="tk-var">$payload</span><span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">]</span> <span class="tk-p">:</span> <span class="tk-keyword">null</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>The framework does not decode JSON for you: the shape is yours to narrow, and doing it at the edge is what keeps <code>mixed</code> out of the rest of your code.</p>
+
+<h2>Route parameters</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// Route: /users/{id}/posts/{slug}</span>
+<span class="tk-var">$request</span>-&gt;<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>      <span class="tk-comment">// &quot;42&quot;</span>
+<span class="tk-var">$request</span>-&gt;<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-string">&#039;slug&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// &quot;hello-world&quot;</span>
+<span class="tk-var">$request</span>-&gt;<span class="tk-fn">attributes</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>         <span class="tk-comment">// [&#039;id&#039; =&gt; &#039;42&#039;, &#039;slug&#039; =&gt; &#039;hello-world&#039;]</span></code></pre></figure>
+
+<p>Attributes are also how middleware annotates a request for layers further in:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">process</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">,</span> <span class="tk-class">RequestScope</span> <span class="tk-var">$scope</span><span class="tk-p">,</span> <span class="tk-class">Closure</span> <span class="tk-var">$next</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">return</span> <span class="tk-var">$next</span><span class="tk-p">(</span><span class="tk-var">$request</span>-&gt;<span class="tk-fn">withAttribute</span><span class="tk-p">(</span><span class="tk-string">&#039;requestId&#039;</span><span class="tk-p">,</span> <span class="tk-fn">bin2hex</span><span class="tk-p">(</span><span class="tk-fn">random_bytes</span><span class="tk-p">(</span><span class="tk-num">8</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<h2>Cookies</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$request</span>-&gt;<span class="tk-fn">cookie</span><span class="tk-p">(</span><span class="tk-string">&#039;orbit_session&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// string | null</span>
+<span class="tk-var">$request</span>-&gt;<span class="tk-fn">cookies</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                 <span class="tk-comment">// [&#039;orbit_session&#039; =&gt; &#039;...&#039;, &#039;theme&#039; =&gt; &#039;dark&#039;]</span></code></pre></figure>
+
+<p>Setting cookies is a <a href="responses.html">response</a> concern.</p>
+
+<h2>Uploads</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$avatar</span> <span class="tk-p">=</span> <span class="tk-var">$request</span>-&gt;<span class="tk-fn">file</span><span class="tk-p">(</span><span class="tk-string">&#039;avatar&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>       <span class="tk-comment">// UploadedFile | null</span>
+<span class="tk-var">$request</span>-&gt;<span class="tk-fn">files</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                        <span class="tk-comment">// [&#039;avatar&#039; =&gt; UploadedFile]</span>
+
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-var">$avatar</span> !== <span class="tk-keyword">null</span> &amp;&amp; <span class="tk-var">$avatar</span>-&gt;<span class="tk-fn">isValid</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-var">$stored</span> <span class="tk-p">=</span> <span class="tk-var">$avatar</span>-&gt;<span class="tk-fn">moveTo</span><span class="tk-p">(</span><span class="tk-var">$directory</span><span class="tk-p">,</span> <span class="tk-string">&#039;user-42.png&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p><a href="uploads.html">Uploads have their own page</a> — quotas, content sniffing and the cleanup contract matter more than the accessor.</p>
+
+<h2>Immutability</h2>
+
+<p>Every <code>with*</code> method returns a copy. The original is never modified, which is what makes it safe to hand the same request to several layers.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$one</span> <span class="tk-p">=</span> <span class="tk-var">$request</span>-&gt;<span class="tk-fn">withAttribute</span><span class="tk-p">(</span><span class="tk-string">&#039;a&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;1&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$two</span> <span class="tk-p">=</span> <span class="tk-var">$one</span>-&gt;<span class="tk-fn">withAttribute</span><span class="tk-p">(</span><span class="tk-string">&#039;b&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;2&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$request</span>-&gt;<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-string">&#039;a&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// null — untouched</span>
+<span class="tk-var">$two</span>-&gt;<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-string">&#039;a&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>       <span class="tk-comment">// &quot;1&quot;</span></code></pre></figure>
+
+<h2>Building one in a test</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Headers</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Method</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\ServerRequest</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Uri</span><span class="tk-p">;</span>
+
+<span class="tk-var">$request</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-fn">ServerRequest</span><span class="tk-p">(</span>
+    <span class="tk-class">Method</span>::<span class="tk-class">Post</span><span class="tk-p">,</span>
+    <span class="tk-class">Uri</span>::<span class="tk-fn">fromRequestTarget</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles?draft=1&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;http&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;localhost&#039;</span><span class="tk-p">,</span> <span class="tk-num">8080</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-class">Headers</span>::<span class="tk-fn">fromArray</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;Content-Type&#039;</span> =&gt; <span class="tk-string">&#039;application/x-www-form-urlencoded&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    body<span class="tk-p">:</span> <span class="tk-string">&#039;title=Hello&#039;</span><span class="tk-p">,</span>
+    cookies<span class="tk-p">:</span> <span class="tk-p">[</span><span class="tk-string">&#039;orbit_session&#039;</span> =&gt; <span class="tk-var">$id</span><span class="tk-p">]</span><span class="tk-p">,</span>
+    form<span class="tk-p">:</span> <span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-string">&#039;Hello&#039;</span><span class="tk-p">]</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>The suite ships a helper that does this for you — see <a href="testing.html">Testing</a>.</p>
+    </article>
+    <nav class="pager"><a href="controllers.html"><span>Previous</span>Controllers</a><a class="next" href="responses.html"><span>Next</span>Responses</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

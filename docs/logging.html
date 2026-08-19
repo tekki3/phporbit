@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logging — phporbit</title>
+<meta name="description" content="Structured output that lands in the right place on every deployment target.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html" class="current" aria-current="page">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Logging</h1>
+        <p class="summary">Structured output that lands in the right place on every deployment target.</p>
+        <figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Log\Level</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Log\Logger</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">PublishArticle</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span><span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Logger</span> <span class="tk-var">$logger</span><span class="tk-p">)</span>
+    <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$this</span>-&gt;logger-&gt;<span class="tk-fn">log</span><span class="tk-p">(</span><span class="tk-class">Level</span>::<span class="tk-class">Info</span><span class="tk-p">,</span> <span class="tk-string">&#039;article published&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+            <span class="tk-string">&#039;id&#039;</span> =&gt; <span class="tk-var">$id</span><span class="tk-p">,</span>
+            <span class="tk-string">&#039;author&#039;</span> =&gt; <span class="tk-var">$authorId</span><span class="tk-p">,</span>
+        <span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">redirect</span><span class="tk-p">(</span><span class="tk-string">&#039;/articles&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p>One method, four levels: <code>Debug</code>, <code>Info</code>, <code>Warning</code>, <code>Error</code>.</p>
+
+<h2>Output</h2>
+
+<p>One JSON object per line — greppable by a human, parseable by anything else:</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>{&quot;time&quot;:&quot;2026-08-10T14:22:01+00:00&quot;,&quot;level&quot;:&quot;info&quot;,&quot;message&quot;:&quot;article published&quot;,&quot;context&quot;:{&quot;id&quot;:42,&quot;author&quot;:7}}
+{&quot;time&quot;:&quot;2026-08-10T14:22:03+00:00&quot;,&quot;level&quot;:&quot;error&quot;,&quot;message&quot;:&quot;payment declined&quot;,&quot;context&quot;:{&quot;order&quot;:118}}</code></pre></figure>
+
+<p><code>context</code> is omitted entirely when empty, so ordinary lines stay short.</p>
+
+<div class="good">
+<b>A newline in user input cannot forge an entry</b>
+<p>The message is JSON-encoded, so a value containing <code>\n"level":"error"</code> stays one line and one field. Line-oriented logs that interpolate raw strings are trivially forgeable by anyone who can influence a logged value.</p>
+</div>
+
+<h2>Where it goes</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Log\StreamLogger</span><span class="tk-p">;</span>
+
+<span class="tk-var">$logger</span> <span class="tk-p">=</span> <span class="tk-class">StreamLogger</span>::<span class="tk-fn">standardError</span><span class="tk-p">(</span><span class="tk-class">Level</span>::<span class="tk-class">Info</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<div class="scroller">
+<table>
+<thead><tr><th>Target</th><th>Where lines land</th></tr></thead>
+<tbody>
+<tr><td><code>./orbit serve</code></td><td>Your terminal</td></tr>
+<tr><td>nginx + PHP-FPM</td><td>The pool's error log</td></tr>
+<tr><td>Apache</td><td>The server error log</td></tr>
+<tr><td>FrankenPHP</td><td>The server's stderr, and so your container logs</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="warn">
+<b>Never the STDERR constant</b>
+<p><code>STDERR</code> is defined only under the CLI SAPI. Referring to it in <code>app/bootstrap.php</code> or anywhere in <code>src/</code> is a fatal error at boot under FPM, Apache and <code>php -S</code> — and the test suite will not catch it, because the suite itself runs under the CLI.</p>
+<p><code>StreamLogger::standardError()</code> opens the <code>php://stderr</code> wrapper, which exists everywhere. <code>tests/Unit/PortabilityTest.php</code> fails the build if the constant reappears.</p>
+</div>
+
+<p>To log to a file instead:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$handle</span> <span class="tk-p">=</span> <span class="tk-fn">fopen</span><span class="tk-p">(</span><span class="tk-var">$root</span> <span class="tk-p">.</span> <span class="tk-string">&#039;/storage/logs/app.log&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;ab&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$logger</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-fn">StreamLogger</span><span class="tk-p">(</span><span class="tk-var">$handle</span><span class="tk-p">,</span> <span class="tk-class">Level</span>::<span class="tk-class">Info</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Append mode matters: several workers may hold the same file open.</p>
+
+<h2>Levels</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-class">Level</span>::<span class="tk-class">Debug</span><span class="tk-p">;</span>     <span class="tk-comment">// developing only — noisy by design</span>
+<span class="tk-class">Level</span>::<span class="tk-class">Info</span><span class="tk-p">;</span>      <span class="tk-comment">// something happened that you would want in an audit</span>
+<span class="tk-class">Level</span>::<span class="tk-class">Warning</span><span class="tk-p">;</span>   <span class="tk-comment">// recovered, but someone should look</span>
+<span class="tk-class">Level</span>::<span class="tk-class">Error</span><span class="tk-p">;</span>     <span class="tk-comment">// the request failed</span>
+
+<span class="tk-class">Level</span>::<span class="tk-fn">fromName</span><span class="tk-p">(</span><span class="tk-string">&#039;warning&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// parses configuration</span>
+<span class="tk-class">Level</span>::<span class="tk-class">Warning</span>-&gt;<span class="tk-fn">severity</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// for comparisons</span></code></pre></figure>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-var">LOG_LEVEL</span><span class="tk-p">=</span><span class="tk-string">info</span></code></pre></figure>
+
+<p>Entries below the configured minimum are dropped before formatting, so debug logging costs almost nothing when switched off.</p>
+
+<p>A typo is rejected rather than guessed at:</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>ValueError: Unknown log level &quot;warn&quot;. Use one of: debug, info, warning, error.</code></pre></figure>
+
+<p>Silently falling back to <code>debug</code> would put request detail into production logs; falling back to <code>error</code> would hide warnings someone deliberately asked for.</p>
+
+<h2>Request logging</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Log\LogRequests</span><span class="tk-p">;</span>
+
+<span class="tk-var">$app</span>-&gt;<span class="tk-fn">middleware</span><span class="tk-p">(</span><span class="tk-keyword">new</span> <span class="tk-fn">LogRequests</span><span class="tk-p">(</span><span class="tk-var">$logger</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>{&quot;time&quot;:&quot;…&quot;,&quot;level&quot;:&quot;info&quot;,&quot;message&quot;:&quot;request&quot;,&quot;context&quot;:{&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/articles&quot;,&quot;status&quot;:200,&quot;ms&quot;:12.4}}
+{&quot;time&quot;:&quot;…&quot;,&quot;level&quot;:&quot;warning&quot;,&quot;message&quot;:&quot;request&quot;,&quot;context&quot;:{&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/nope&quot;,&quot;status&quot;:404,&quot;ms&quot;:0.8}}
+{&quot;time&quot;:&quot;…&quot;,&quot;level&quot;:&quot;error&quot;,&quot;message&quot;:&quot;request&quot;,&quot;context&quot;:{&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/articles&quot;,&quot;status&quot;:500,&quot;ms&quot;:31.7}}</code></pre></figure>
+
+<p>The level follows the status: 5xx logs as an error, 4xx as a warning, everything else as info. Register it <strong>first</strong>, so it observes the true status of everything below it — including responses produced by other middleware.</p>
+
+<h2>What not to log</h2>
+
+<div class="warn">
+<b>Context goes into your log aggregator</b>
+<p>Passwords, tokens, session ids, full card numbers and personal data do not belong there. The framework holds this line itself: <code>QueryFailed</code> carries the SQL but never the bound parameters, and configuration errors name the key but never the value.</p>
+</div>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// No</span>
+<span class="tk-var">$logger</span>-&gt;<span class="tk-fn">log</span><span class="tk-p">(</span><span class="tk-class">Level</span>::<span class="tk-class">Info</span><span class="tk-p">,</span> <span class="tk-string">&#039;login&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;email&#039;</span> =&gt; <span class="tk-var">$email</span><span class="tk-p">,</span> <span class="tk-string">&#039;password&#039;</span> =&gt; <span class="tk-var">$password</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Yes</span>
+<span class="tk-var">$logger</span>-&gt;<span class="tk-fn">log</span><span class="tk-p">(</span><span class="tk-class">Level</span>::<span class="tk-class">Info</span><span class="tk-p">,</span> <span class="tk-string">&#039;login&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;user&#039;</span> =&gt; <span class="tk-var">$user</span>-&gt;<span class="tk-fn">authIdentifier</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Your own logger</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Log\Logger</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">FanOutLogger</span> <span class="tk-keyword">implements</span> <span class="tk-class">Logger</span>
+<span class="tk-p">{</span>
+    <span class="tk-comment">/** @param list&lt;Logger&gt; $loggers */</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span><span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> array <span class="tk-var">$loggers</span><span class="tk-p">)</span>
+    <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">log</span><span class="tk-p">(</span><span class="tk-class">Level</span> <span class="tk-var">$level</span><span class="tk-p">,</span> <span class="tk-keyword">string</span> <span class="tk-var">$message</span><span class="tk-p">,</span> array <span class="tk-var">$context</span> <span class="tk-p">=</span> <span class="tk-p">[</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">foreach</span> <span class="tk-p">(</span><span class="tk-var">$this</span>-&gt;loggers <span class="tk-keyword">as</span> <span class="tk-var">$logger</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+            <span class="tk-var">$logger</span>-&gt;<span class="tk-fn">log</span><span class="tk-p">(</span><span class="tk-var">$level</span><span class="tk-p">,</span> <span class="tk-var">$message</span><span class="tk-p">,</span> <span class="tk-var">$context</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-p">}</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p>Register it as the <code>Logger</code> singleton at boot and everything that injects the interface picks it up.</p>
+
+<div class="note">
+<b>Loggers are shared</b>
+<p>A logger is a boot singleton, used by every request the worker serves. Do not buffer entries on the instance intending to flush them at the end of a request — that buffer would span requests. Write as you go, or flush from <code>$scope-&gt;onClose()</code>.</p>
+</div>
+    </article>
+    <nav class="pager"><a href="admin-ui.html"><span>Previous</span>The admin UI</a><a class="next" href="testing.html"><span>Next</span>Testing</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

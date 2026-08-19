@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Query builder — phporbit</title>
+<meta name="description" content="A deliberately thin fluent builder — with two safety rules that will stop you at least once.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html" class="current" aria-current="page">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Query builder</h1>
+        <p class="summary">A deliberately thin fluent builder — with two safety rules that will stop you at least once.</p>
+        <p>The builder composes SQL with bound placeholders so common cases read well. It is not an ORM, and it does not try to be: hand-written SQL through <code>Connection::select()</code> is the escape hatch and the better tool for joins, window functions and CTEs.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$articles</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">select</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;title&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;created_at&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;published&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">true</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;author_id&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> <span class="tk-var">$authorId</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">orderBy</span><span class="tk-p">(</span><span class="tk-string">&#039;created_at&#039;</span><span class="tk-p">,</span> <span class="tk-class">Direction</span>::<span class="tk-class">Descending</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">limit</span><span class="tk-p">(</span><span class="tk-num">20</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Reading</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$query</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$query</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                    <span class="tk-comment">// list&lt;array&lt;string, scalar|null&gt;&gt;</span>
+<span class="tk-var">$query</span>-&gt;<span class="tk-fn">first</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                  <span class="tk-comment">// array|null — adds LIMIT 1</span>
+<span class="tk-var">$query</span>-&gt;<span class="tk-fn">value</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>           <span class="tk-comment">// a single column from the first row</span>
+<span class="tk-var">$query</span>-&gt;<span class="tk-fn">count</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                  <span class="tk-comment">// int</span>
+<span class="tk-var">$query</span>-&gt;<span class="tk-fn">exists</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                 <span class="tk-comment">// bool</span></code></pre></figure>
+
+<h2>Conditions</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;LIKE&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;%orbit%&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;views&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;&gt;=&#039;</span><span class="tk-p">,</span> <span class="tk-num">100</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">whereNotNull</span><span class="tk-p">(</span><span class="tk-string">&#039;published_at&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">whereIn</span><span class="tk-p">(</span><span class="tk-string">&#039;status&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;live&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;featured&#039;</span><span class="tk-p">]</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Conditions combine with <code>AND</code>. Permitted operators: <code>=</code>, <code>!=</code>, <code>&lt;&gt;</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>, <code>LIKE</code>, <code>NOT LIKE</code>.</p>
+
+<p>An operator is concatenated into the SQL, so it comes from a whitelist rather than being passed through:</p>
+
+<figure class="code"><figcaption>Output</figcaption><pre><code>InvalidArgumentException: Operator &quot;IS&quot; is not permitted.
+  Use one of: =, !=, &lt;&gt;, &lt;, &lt;=, &gt;, &gt;=, LIKE, NOT LIKE.</code></pre></figure>
+
+<h3>Nulls</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;published_at&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">null</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// InvalidArgumentException: Comparing to null never matches.</span>
+<span class="tk-comment">//   Use whereNull() or whereNotNull().</span>
+
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">whereNull</span><span class="tk-p">(</span><span class="tk-string">&#039;published_at&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">whereNotNull</span><span class="tk-p">(</span><span class="tk-string">&#039;published_at&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p><code>= NULL</code> is never true in SQL. Callers almost always mean <code>IS NULL</code>, so the builder says so instead of quietly returning nothing.</p>
+
+<h3>Empty sets</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">whereIn</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-p">]</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// []</span></code></pre></figure>
+
+<p>An empty <code>whereIn</code> becomes a condition that matches nothing. <code>IN ()</code> is a syntax error, and dropping the condition would turn &ldquo;none of these&rdquo; into &ldquo;all rows&rdquo; — the more dangerous of the two readings.</p>
+
+<h2>Ordering and paging</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Direction</span><span class="tk-p">;</span>
+
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">orderBy</span><span class="tk-p">(</span><span class="tk-string">&#039;created_at&#039;</span><span class="tk-p">,</span> <span class="tk-class">Direction</span>::<span class="tk-class">Descending</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">orderBy</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">)</span>                          <span class="tk-comment">// Ascending by default</span>
+    -&gt;<span class="tk-fn">limit</span><span class="tk-p">(</span><span class="tk-num">20</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">offset</span><span class="tk-p">(</span><span class="tk-num">40</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Direction is an enum, so <code>"ASC"</code>/<code>"DESC"</code> is never a caller-supplied string concatenated into SQL.</p>
+
+<h2>Writing</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// Returns the generated id</span>
+<span class="tk-var">$id</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">insert</span><span class="tk-p">(</span><span class="tk-p">[</span>
+    <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-var">$title</span><span class="tk-p">,</span>
+    <span class="tk-string">&#039;body&#039;</span> =&gt; <span class="tk-var">$body</span><span class="tk-p">,</span>
+    <span class="tk-string">&#039;created_at&#039;</span> =&gt; <span class="tk-fn">gmdate</span><span class="tk-p">(</span><span class="tk-string">&#039;c&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+<span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Returns rows changed</span>
+<span class="tk-var">$changed</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> <span class="tk-var">$id</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">update</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-var">$newTitle</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$removed</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> <span class="tk-var">$id</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">delete</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>The two rules that will stop you</h2>
+
+<h3>1. An unqualified UPDATE or DELETE throws</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">delete</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// UnsafeQuery: This DELETE has no conditions and would affect every row of</span>
+<span class="tk-comment">//   &quot;articles&quot;. Add a where(), or call affectingEveryRow() if that is genuinely</span>
+<span class="tk-comment">//   the intent.</span>
+
+<span class="tk-comment">// When you do mean it, say so:</span>
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;sessions&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">affectingEveryRow</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">delete</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>A forgotten <code>where()</code> is one of the most expensive mistakes available in a few keystrokes, and it looks identical to a deliberate whole-table change unless the caller states which they meant.</p>
+
+<h3>2. Identifiers are whitelisted</h3>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">orderBy</span><span class="tk-p">(</span><span class="tk-var">$request</span>-&gt;uri-&gt;<span class="tk-fn">queryParam</span><span class="tk-p">(</span><span class="tk-string">&#039;sort&#039;</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;id&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// InvalidArgumentException: Identifier &quot;title; DROP TABLE users&quot; is not a plain</span>
+<span class="tk-comment">//   table or column name. Identifiers cannot be bound as parameters, so only</span>
+<span class="tk-comment">//   letters, digits and underscores are accepted.</span></code></pre></figure>
+
+<p>No driver can bind an identifier, so it is always concatenated. A whitelist has one answer; escaping invites the question &ldquo;escaped well enough?&rdquo;</p>
+
+<p>Sorting by user input is still fine — map it yourself:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$sortable</span> <span class="tk-p">=</span> <span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;created_at&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;views&#039;</span><span class="tk-p">]</span><span class="tk-p">;</span>
+<span class="tk-var">$requested</span> <span class="tk-p">=</span> <span class="tk-var">$request</span>-&gt;uri-&gt;<span class="tk-fn">queryParam</span><span class="tk-p">(</span><span class="tk-string">&#039;sort&#039;</span><span class="tk-p">)</span> ?? <span class="tk-string">&#039;created_at&#039;</span><span class="tk-p">;</span>
+<span class="tk-var">$column</span> <span class="tk-p">=</span> <span class="tk-fn">in_array</span><span class="tk-p">(</span><span class="tk-var">$requested</span><span class="tk-p">,</span> <span class="tk-var">$sortable</span><span class="tk-p">,</span> <span class="tk-keyword">true</span><span class="tk-p">)</span> <span class="tk-p">?</span> <span class="tk-var">$requested</span> <span class="tk-p">:</span> <span class="tk-string">&#039;created_at&#039;</span><span class="tk-p">;</span>
+
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">orderBy</span><span class="tk-p">(</span><span class="tk-var">$column</span><span class="tk-p">,</span> <span class="tk-class">Direction</span>::<span class="tk-class">Descending</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Immutability</h2>
+
+<p>Every method returns a new builder, so a base query is safe to reuse:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$published</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;published&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">true</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$recent</span> <span class="tk-p">=</span> <span class="tk-var">$published</span>-&gt;<span class="tk-fn">orderBy</span><span class="tk-p">(</span><span class="tk-string">&#039;created_at&#039;</span><span class="tk-p">,</span> <span class="tk-class">Direction</span>::<span class="tk-class">Descending</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">limit</span><span class="tk-p">(</span><span class="tk-num">5</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$total</span> <span class="tk-p">=</span> <span class="tk-var">$published</span>-&gt;<span class="tk-fn">count</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>     <span class="tk-comment">// unaffected by the ordering above</span></code></pre></figure>
+
+<h2>Inspecting the SQL</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$query</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">select</span><span class="tk-p">(</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;title&#039;</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;published&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">true</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">limit</span><span class="tk-p">(</span><span class="tk-num">10</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$query</span>-&gt;<span class="tk-fn">toSql</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// SELECT &quot;id&quot;, &quot;title&quot; FROM &quot;articles&quot; WHERE &quot;published&quot; = :p0 LIMIT 10</span>
+
+<span class="tk-var">$query</span>-&gt;<span class="tk-fn">bindings</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-comment">// [&#039;p0&#039; =&gt; true]</span></code></pre></figure>
+
+<p>Useful in tests, and for confirming what a chain actually produced.</p>
+
+<h2>When to drop to SQL</h2>
+
+<p>There are no joins or aggregates beyond <code>count()</code>. That is deliberate — a half-built join API is worse than none, because it looks like it should handle the next case and does not.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$rows</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">select</span><span class="tk-p">(</span>
+    <span class="tk-string">&#039;SELECT a.id, a.title, u.name AS author, COUNT(c.id) AS comments
+       FROM articles a
+       JOIN users u ON u.id = a.author_id
+       LEFT JOIN comments c ON c.article_id = a.id
+      WHERE a.published = :published
+      GROUP BY a.id
+      ORDER BY comments DESC
+      LIMIT 10&#039;</span><span class="tk-p">,</span>
+    <span class="tk-p">[</span><span class="tk-string">&#039;published&#039;</span> =&gt; <span class="tk-keyword">true</span><span class="tk-p">]</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Still fully parameterised, still typed rows. Reach for it without hesitation.</p>
+    </article>
+    <nav class="pager"><a href="database.html"><span>Previous</span>Database</a><a class="next" href="migrations.html"><span>Next</span>Migrations</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

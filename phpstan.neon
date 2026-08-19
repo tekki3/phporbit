@@ -1,0 +1,17 @@
+parameters:
+    level: max
+    paths:
+        - src
+        - tests
+        - app
+        - database
+        - docs
+        - orbit
+        - public
+
+    # The safety model forbids silencing findings with a baseline.
+    # If PHPStan reports something, fix the code.
+    treatPhpDocTypesAsCertain: true
+
+    # No ignoreErrors and no baseline: the safety model treats a PHPStan
+    # finding as a defect to fix, not a warning to record.

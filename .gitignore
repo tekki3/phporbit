@@ -1,0 +1,19 @@
+/vendor/
+/composer.lock
+/.phpunit.cache/
+/.phpstan.cache/
+
+# Runtime state: sessions, compiled templates, the demo database.
+/storage/
+
+# Python bytecode from brand/render.py.
+__pycache__/
+
+# Uploaded files.
+/public/avatars/*
+!/public/avatars/.gitkeep
+
+# Local configuration and secrets. .env.example is committed; .env never is.
+.env
+.env.*
+!.env.example

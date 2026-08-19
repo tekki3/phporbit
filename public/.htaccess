@@ -1,0 +1,25 @@
+# Apache front controller.
+#
+# Real files are served directly; everything else reaches index.php. The
+# rewrite deliberately does not pass the path as a query parameter — the
+# adapter reads REQUEST_URI, which Apache leaves intact.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Without mod_rewrite the application would silently 404, so fail loudly.
+<IfModule !mod_rewrite.c>
+    <IfModule mod_dir.c>
+        DirectoryIndex index.php
+    </IfModule>
+</IfModule>
+
+# Never serve dotfiles.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

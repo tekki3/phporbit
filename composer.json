@@ -1,0 +1,36 @@
+{
+    "name": "phporbit/phporbit",
+    "description": "A safe PHP framework that runs identically on its own server, FrankenPHP, nginx+FPM and Apache.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.3"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^11.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "PhpOrbit\\": "src/",
+            "App\\": "app/src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PhpOrbit\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "orbit"
+    ],
+    "scripts": {
+        "test": "phpunit",
+        "test:integration": "phpunit --testsuite integration",
+        "stan": "phpstan analyse"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable"
+}

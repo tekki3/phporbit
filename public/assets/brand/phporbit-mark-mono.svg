@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="phporbit-mono-title">
+  <title id="phporbit-mono-title">phporbit</title>
+  <!--
+    Single-colour mark. Inherits currentColor, so it takes the colour of the
+    surrounding text — use this for print, embroidery, stencils, engraving, or
+    anywhere the gradient cannot survive. It is also the version to reach for
+    when the mark sits on a photograph or a busy background.
+  -->
+  <g fill="none" stroke="currentColor" stroke-width="3.25">
+    <ellipse cx="32" cy="32" rx="27" ry="11.5" transform="rotate(-28 32 32)"/>
+    <ellipse cx="32" cy="32" rx="27" ry="11.5" transform="rotate(28 32 32)"/>
+  </g>
+
+  <circle cx="32" cy="32" r="7.5" fill="currentColor"/>
+
+  <circle cx="55.84" cy="19.32" r="4.5" fill="currentColor"/>
+  <circle cx="8.16" cy="44.68" r="3" fill="currentColor"/>
+</svg>

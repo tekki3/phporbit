@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Database — phporbit</title>
+<meta name="description" content="Prepared statements only, typed rows, transactions, and why the connection is a singleton.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html" class="current" aria-current="page">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Database</h1>
+        <p class="summary">Prepared statements only, typed rows, transactions, and why the connection is a singleton.</p>
+        <p><code>Connection</code> wraps PDO and only speaks in prepared statements. There is no method that takes a fully-built query with values in it.</p>
+
+<h2>Choosing an engine</h2>
+
+<p>SQLite, MySQL/MariaDB and PostgreSQL are supported. Pick one in <code>.env</code>; nothing in your application changes.</p>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-comment"># sqlite | mysql | pgsql   (&quot;postgres&quot;, &quot;postgresql&quot; and &quot;mariadb&quot; also work)</span>
+<span class="tk-var">DB_DRIVER</span><span class="tk-p">=</span><span class="tk-string">sqlite</span>
+
+<span class="tk-comment"># sqlite: a file path, resolved against the project root. &quot;:memory:&quot; works too.</span>
+<span class="tk-comment"># mysql/pgsql: the database name, and required.</span>
+<span class="tk-var">DB_DATABASE</span><span class="tk-p">=</span><span class="tk-string">storage/app.sqlite</span>
+
+<span class="tk-comment"># Ignored by sqlite. Port defaults to 3306 (mysql) or 5432 (pgsql).</span>
+<span class="tk-comment">#DB_HOST=127.0.0.1</span>
+<span class="tk-comment">#DB_PORT=3306</span>
+<span class="tk-comment">#DB_USERNAME=orbit</span>
+<span class="tk-comment">#DB_PASSWORD=</span>
+<span class="tk-comment">#DB_CHARSET=utf8mb4</span>
+<span class="tk-comment">#DB_SOCKET=/var/run/mysqld/mysqld.sock</span></code></pre></figure>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Connection</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\DatabaseSettings</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Read and validated once, at boot.</span>
+<span class="tk-var">$database</span> <span class="tk-p">=</span> <span class="tk-class">Connection</span>::<span class="tk-fn">connect</span><span class="tk-p">(</span><span class="tk-class">DatabaseSettings</span>::<span class="tk-fn">fromEnvironment</span><span class="tk-p">(</span><span class="tk-var">$env</span><span class="tk-p">,</span> <span class="tk-var">$root</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// Or explicitly, without an .env</span>
+<span class="tk-var">$database</span> <span class="tk-p">=</span> <span class="tk-class">Connection</span>::<span class="tk-fn">connect</span><span class="tk-p">(</span><span class="tk-class">DatabaseSettings</span>::<span class="tk-fn">postgres</span><span class="tk-p">(</span><span class="tk-string">&#039;orbit&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;db.internal&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$database</span> <span class="tk-p">=</span> <span class="tk-class">Connection</span>::<span class="tk-fn">connect</span><span class="tk-p">(</span><span class="tk-class">DatabaseSettings</span>::<span class="tk-fn">mysql</span><span class="tk-p">(</span><span class="tk-string">&#039;orbit&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;db.internal&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$database</span> <span class="tk-p">=</span> <span class="tk-class">Connection</span>::<span class="tk-fn">sqlite</span><span class="tk-p">(</span><span class="tk-var">$root</span> <span class="tk-p">.</span> <span class="tk-string">&#039;/storage/app.sqlite&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Settings are validated at boot, so a missing database name or an out-of-range port stops the application starting rather than surfacing on whichever request queries first:</p>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit routes
+Configuration error: Setting &quot;DB_DRIVER&quot; is not a valid database driver.
+Accepted values: sqlite, mysql, pgsql.</code></pre></figure>
+
+<h2>What the framework smooths over</h2>
+
+<div class="scroller">
+<table>
+<thead><tr><th>Difference between engines</th><th>How it is handled</th></tr></thead>
+<tbody>
+<tr><td>MySQL reads <code>"x"</code> as a string, not an identifier</td><td>Identifiers are quoted with backticks there, double quotes elsewhere.</td></tr>
+<tr><td><code>OFFSET</code> without <code>LIMIT</code> is a syntax error on two of the three</td><td>The builder emits each engine's idiom.</td></tr>
+<tr><td>Auto-increment keys are spelled three ways</td><td><code>$database-&gt;driver()-&gt;autoIncrementPrimaryKey()</code>, for migrations.</td></tr>
+<tr><td>PostgreSQL's <code>lastInsertId()</code> is session-wide</td><td><code>insert()</code> uses <code>RETURNING</code> there.</td></tr>
+<tr><td>MySQL truncates over-long values by default</td><td>A strict <code>sql_mode</code> is set per connection.</td></tr>
+<tr><td>SQLite ignores foreign keys by default</td><td><code>PRAGMA foreign_keys</code> is set per connection.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="warn">
+<b>Quoting is per connection, not a server setting</b>
+<p>Switching MySQL's <code>sql_mode</code> to <code>ANSI_QUOTES</code> would be the other way to make double quotes work, and a worse one: it changes how every other statement on that connection is parsed, including SQL you wrote yourself.</p>
+</div>
+
+<p>Registered as a singleton at boot, then injected wherever it is needed:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">singleton</span><span class="tk-p">(</span><span class="tk-class">Connection</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Connection</span> =&gt; <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Reading</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// list&lt;array&lt;string, scalar|null&gt;&gt;</span>
+<span class="tk-var">$rows</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">select</span><span class="tk-p">(</span>
+    <span class="tk-string">&#039;SELECT id, title FROM articles WHERE author_id = :author ORDER BY created_at DESC&#039;</span><span class="tk-p">,</span>
+    <span class="tk-p">[</span><span class="tk-string">&#039;author&#039;</span> =&gt; <span class="tk-var">$authorId</span><span class="tk-p">]</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// array&lt;string, scalar|null&gt;|null</span>
+<span class="tk-var">$article</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">selectOne</span><span class="tk-p">(</span>
+    <span class="tk-string">&#039;SELECT * FROM articles WHERE id = :id&#039;</span><span class="tk-p">,</span>
+    <span class="tk-p">[</span><span class="tk-string">&#039;id&#039;</span> =&gt; <span class="tk-var">$id</span><span class="tk-p">]</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// A single scalar</span>
+<span class="tk-var">$count</span> <span class="tk-p">=</span> (int) <span class="tk-var">$database</span>-&gt;<span class="tk-fn">selectValue</span><span class="tk-p">(</span><span class="tk-string">&#039;SELECT COUNT(*) FROM articles&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Writing</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$changed</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">execute</span><span class="tk-p">(</span>
+    <span class="tk-string">&#039;UPDATE articles SET title = :title WHERE id = :id&#039;</span><span class="tk-p">,</span>
+    <span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-var">$title</span><span class="tk-p">,</span> <span class="tk-string">&#039;id&#039;</span> =&gt; <span class="tk-var">$id</span><span class="tk-p">]</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$id</span> <span class="tk-p">=</span> (int) <span class="tk-var">$database</span>-&gt;<span class="tk-fn">lastInsertId</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Schema statements</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-string">&#039;CREATE TABLE articles (id INTEGER PRIMARY KEY, title TEXT NOT NULL)&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Separate from <code>execute()</code> because it binds nothing. Reaching for a method with no parameter binding should be a visible decision, not a convenient shortcut for interpolating a value.</p>
+
+<h2>Why values are always bound</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-comment">// There is no API that accepts this. Deliberately.</span>
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">select</span><span class="tk-p">(</span><span class="tk-p">&quot;</span><span class="tk-string">SELECT * FROM users WHERE email = &#039;</span>{<span class="tk-var">$email</span><span class="tk-p">}</span><span class="tk-string">&#039;</span><span class="tk-p">&quot;</span><span class="tk-p">)</span><span class="tk-p">;</span>   <span class="tk-comment">// no such thing</span>
+
+<span class="tk-comment">// This is the only way, and a value can never be parsed as SQL.</span>
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">select</span><span class="tk-p">(</span><span class="tk-string">&#039;SELECT * FROM users WHERE email = :email&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;email&#039;</span> =&gt; <span class="tk-var">$email</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>Emulated prepares are switched <strong>off</strong>. With emulation on, PDO interpolates values itself before sending the query, which reintroduces exactly the class of bug prepared statements exist to remove.</p>
+
+<div class="warn">
+<b>Identifiers are the exception</b>
+<p>No driver can bind a table or column name — placeholders only work for values. Anything dynamic there must come from a list your application controls, never from a request. The <a href="queries.html">query builder</a> whitelists identifiers for you.</p>
+</div>
+
+<h2>Transactions</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$articleId</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">transaction</span><span class="tk-p">(</span><span class="tk-keyword">function</span> <span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span> <span class="tk-keyword">use</span> <span class="tk-p">(</span><span class="tk-var">$data</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">int</span> <span class="tk-p">{</span>
+    <span class="tk-var">$id</span> <span class="tk-p">=</span> (int) <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">insert</span><span class="tk-p">(</span><span class="tk-var">$data</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;audit&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">insert</span><span class="tk-p">(</span><span class="tk-p">[</span>
+        <span class="tk-string">&#039;action&#039;</span> =&gt; <span class="tk-string">&#039;article.created&#039;</span><span class="tk-p">,</span>
+        <span class="tk-string">&#039;article_id&#039;</span> =&gt; <span class="tk-var">$id</span><span class="tk-p">,</span>
+    <span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+    <span class="tk-keyword">return</span> <span class="tk-var">$id</span><span class="tk-p">;</span>   <span class="tk-comment">// committed, and returned</span>
+<span class="tk-p">}</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>The closure's return value is passed through. If it throws, the transaction rolls back and the exception propagates.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">inTransaction</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>     <span class="tk-comment">// bool</span>
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">rollBackIfOpen</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// for cleanup, not control flow</span></code></pre></figure>
+
+<div class="note">
+<b>The connection is shared, so transactions are guarded</b>
+<p>Under a worker the connection outlives the request. A handler that opens a transaction and throws would hand the next request a connection inside someone else's transaction — their writes would commit or roll back with work they never made. <code>TransactionGuard</code> rolls back anything left open and logs it, so the bug is reported rather than silently corrupting an unrelated request.</p>
+<p>Per-request SAPIs hide this entirely: the process dies and the driver cleans up. It only appears under a worker, which is why the cleanup is explicit rather than left to the runtime.</p>
+</div>
+
+<h2>Typed rows</h2>
+
+<p>PDO returns untyped arrays. <code>Connection</code> narrows them once, at the driver boundary, so nothing downstream deals in <code>mixed</code>:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$row</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">selectOne</span><span class="tk-p">(</span><span class="tk-string">&#039;SELECT id, title, published FROM articles WHERE id = :id&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;id&#039;</span> =&gt; <span class="tk-var">$id</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-comment">// array&lt;string, scalar|null&gt; — narrow to what you need</span>
+<span class="tk-var">$id</span> <span class="tk-p">=</span> (int) <span class="tk-p">(</span><span class="tk-var">$row</span><span class="tk-p">[</span><span class="tk-string">&#039;id&#039;</span><span class="tk-p">]</span> ?? <span class="tk-num">0</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$title</span> <span class="tk-p">=</span> (string) <span class="tk-p">(</span><span class="tk-var">$row</span><span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">]</span> ?? <span class="tk-string">&#039;&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$published</span> <span class="tk-p">=</span> (bool) <span class="tk-p">(</span><span class="tk-var">$row</span><span class="tk-p">[</span><span class="tk-string">&#039;published&#039;</span><span class="tk-p">]</span> ?? <span class="tk-keyword">false</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<h2>Errors</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\QueryFailed</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">try</span> <span class="tk-p">{</span>
+    <span class="tk-var">$database</span>-&gt;<span class="tk-fn">execute</span><span class="tk-p">(</span><span class="tk-string">&#039;INSERT INTO articles (title) VALUES (:title)&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-var">$title</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span> <span class="tk-keyword">catch</span> <span class="tk-p">(</span><span class="tk-class">QueryFailed</span> <span class="tk-var">$e</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-comment">// &quot;Query failed: UNIQUE constraint failed: articles.title</span>
+    <span class="tk-comment">//  -- SQL: INSERT INTO articles (title) VALUES (:title)&quot;</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<div class="good">
+<b>The SQL is in the message; the parameters are not</b>
+<p>The SQL is written by you and is what makes a failure diagnosable. The bound parameters are user data, and routinely contain passwords, tokens and personal information that would then travel into logs and bug reports.</p>
+</div>
+
+<h2>Bringing your own PDO</h2>
+
+<p>Any PDO instance works, provided it is configured the same way and told which engine it is talking to:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Driver</span><span class="tk-p">;</span>
+
+<span class="tk-var">$pdo</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-fn">PDO</span><span class="tk-p">(</span><span class="tk-var">$dsn</span><span class="tk-p">,</span> <span class="tk-var">$user</span><span class="tk-p">,</span> <span class="tk-var">$password</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+    <span class="tk-class">PDO</span>::<span class="tk-class">ATTR_ERRMODE</span> =&gt; <span class="tk-class">PDO</span>::<span class="tk-class">ERRMODE_EXCEPTION</span><span class="tk-p">,</span>
+    <span class="tk-class">PDO</span>::<span class="tk-class">ATTR_DEFAULT_FETCH_MODE</span> =&gt; <span class="tk-class">PDO</span>::<span class="tk-class">FETCH_ASSOC</span><span class="tk-p">,</span>
+    <span class="tk-class">PDO</span>::<span class="tk-class">ATTR_EMULATE_PREPARES</span> =&gt; <span class="tk-keyword">false</span><span class="tk-p">,</span>
+<span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$database</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-fn">Connection</span><span class="tk-p">(</span><span class="tk-var">$pdo</span><span class="tk-p">,</span> <span class="tk-class">Driver</span>::<span class="tk-class">PostgreSql</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>The driver is what the builder consults for quoting and paging, so passing the wrong one produces SQL the server will reject.</p>
+
+<h2>Portable migrations</h2>
+
+<p>Most DDL is accepted by all three. The primary key is not:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">up</span><span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
+<span class="tk-p">{</span>
+    <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-fn">sprintf</span><span class="tk-p">(</span>
+        <span class="tk-string">&#039;CREATE TABLE notes (
+            id %s,
+            title TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )&#039;</span><span class="tk-p">,</span>
+        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">driver</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">autoIncrementPrimaryKey</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<div class="warn">
+<b>Two things to watch when targeting MySQL</b>
+<p><strong>Index a <code>VARCHAR</code>, not a <code>TEXT</code>.</strong> MySQL cannot build a unique index on a <code>TEXT</code> column without a prefix length, so columns you intend to index should be declared <code>VARCHAR(n)</code>.</p>
+<p><strong>DDL is not transactional.</strong> SQLite and PostgreSQL roll a failed migration back cleanly; MySQL commits implicitly on most schema changes, so a failure there can leave a half-applied migration behind. Keep MySQL migrations small for that reason — <code>$database-&gt;driver()-&gt;supportsTransactionalDdl()</code> reports which you are on.</p>
+</div>
+    </article>
+    <nav class="pager"><a href="templates.html"><span>Previous</span>Templates</a><a class="next" href="queries.html"><span>Next</span>Query builder</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

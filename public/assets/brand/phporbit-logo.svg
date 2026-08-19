@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 302 86" width="302" height="86" role="img" aria-labelledby="phporbit-logo-title">
+  <title id="phporbit-logo-title">phporbit</title>
+  <!--
+    Adaptive lockup. The wordmark inherits currentColor, so it takes the colour
+    of the surrounding text and works on either theme without swapping files;
+    the fixed-colour builds beside it are for contexts that cannot set a colour.
+
+    The wordmark is drawn, not set in a typeface. A logo whose shapes depend on
+    which fonts the viewer happens to have installed is not a logo, and the
+    circular bowls deliberately echo the orbits in the mark.
+
+    All strokes are 5 units on a 44-unit body; every curve is a circle of
+    radius 9.5 centred on the x-height. Keep it that way if you extend it.
+  -->
+  <defs>
+    <!--
+      Coordinates are in the MARK's local space, not the lockup's.
+      gradientUnits="userSpaceOnUse" resolves against the user space in effect
+      where the gradient is referenced — inside the translated group below — so
+      adding the group's offset here would shift the ramp by 11 units and leave
+      the mark reading almost entirely blue.
+    -->
+    <linearGradient id="phporbit-logo-grad" x1="6" y1="14" x2="58" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#58a6ff"/>
+      <stop offset="1" stop-color="#a371f7"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(11 11)">
+    <g fill="none" stroke="url(#phporbit-logo-grad)" stroke-width="3.25">
+      <ellipse cx="32" cy="32" rx="27" ry="11.5" transform="rotate(-28 32 32)"/>
+      <ellipse cx="32" cy="32" rx="27" ry="11.5" transform="rotate(28 32 32)"/>
+    </g>
+    <circle cx="32" cy="32" r="7.5" fill="url(#phporbit-logo-grad)"/>
+    <circle cx="55.84" cy="19.32" r="4.5" fill="#58a6ff"/>
+    <circle cx="8.16" cy="44.68" r="3" fill="#a371f7"/>
+  </g>
+
+  <g transform="translate(93.5 21)" fill="none" stroke="currentColor" stroke-width="5">
+    <g opacity="0.55">
+      <g transform="translate(0 0)">
+        <path d="M2.5 10V44"/>
+        <circle cx="12" cy="22" r="9.5"/>
+      </g>
+      <g transform="translate(29 0)">
+        <path d="M2.5 0V34"/>
+        <path d="M2.5 22A9.5 9.5 0 0 1 21.5 22V34"/>
+      </g>
+      <g transform="translate(58 0)">
+        <path d="M2.5 10V44"/>
+        <circle cx="12" cy="22" r="9.5"/>
+      </g>
+    </g>
+
+    <g transform="translate(87 0)">
+      <circle cx="12" cy="22" r="9.5"/>
+    </g>
+    <g transform="translate(116 0)">
+      <path d="M2.5 10V34"/>
+      <path d="M2.5 22A9.5 9.5 0 0 1 20.61 17.99"/>
+    </g>
+    <g transform="translate(144 0)">
+      <path d="M2.5 0V34"/>
+      <circle cx="12" cy="22" r="9.5"/>
+    </g>
+    <g transform="translate(173 0)">
+      <path d="M2.5 10V34"/>
+      <circle cx="2.5" cy="3" r="2.5" fill="currentColor" stroke="none"/>
+    </g>
+    <g transform="translate(183 0)">
+      <path d="M7 2V34"/>
+      <path d="M0 11H14"/>
+    </g>
+  </g>
+</svg>
