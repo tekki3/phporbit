@@ -2,7 +2,23 @@
     "name": "phporbit/phporbit",
     "description": "A safe PHP framework that runs identically on its own server, FrankenPHP, nginx+FPM and Apache.",
     "type": "library",
+    "keywords": [
+        "framework",
+        "php",
+        "frankenphp",
+        "php-fpm",
+        "worker-mode",
+        "security"
+    ],
+    "homepage": "https://github.com/tekki3/phporbit",
     "license": "MIT",
+    "authors": [
+        {
+            "name": "tekki3",
+            "email": "tekki3.nl@gmail.com",
+            "homepage": "https://github.com/tekki3"
+        }
+    ],
     "require": {
         "php": ">=8.3"
     },
