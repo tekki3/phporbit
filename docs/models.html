@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Models — phporbit</title>
+<meta name="description" content="A typed, mutable view of one table — Note::find(1), $note->save() — built entirely on the query builder.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li><li><a href="models.html" class="current" aria-current="page">Models</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Models</h1>
+        <p class="summary">A typed, mutable view of one table — Note::find(1), $note->save() — built entirely on the query builder.</p>
+        <p><code>PhpOrbit\Database\Model</code> maps one table to one class: typed properties, static finders, and <code>save()</code>/<code>delete()</code> on the instance. It adds no SQL capability the <a href="queries.html">query builder</a> does not already have — every method here is built on <code>Query</code>, the same builder <code>$database->query('table')</code> returns. Joins, aggregates beyond <code>count()</code>, and relationships are still <code>Connection::select()</code>'s job.</p>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code>./orbit make:model Note --fields=title:string,body:string,views:int</code></pre></figure>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+
+<span class="tk-keyword">namespace</span> <span class="tk-class">App\Models</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Model</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">Note</span> <span class="tk-keyword">extends</span> <span class="tk-class">Model</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">string</span> <span class="tk-var">$title</span> <span class="tk-p">=</span> <span class="tk-string">&#039;&#039;</span><span class="tk-p">;</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">string</span> <span class="tk-var">$body</span> <span class="tk-p">=</span> <span class="tk-string">&#039;&#039;</span><span class="tk-p">;</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">int</span> <span class="tk-var">$views</span> <span class="tk-p">=</span> <span class="tk-num">0</span><span class="tk-p">;</span>
+
+    <span class="tk-keyword">protected</span> <span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-fn">table</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">string</span>
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">return</span> <span class="tk-string">&#039;notes&#039;</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">protected</span> <span class="tk-keyword">static</span> <span class="tk-keyword">function</span> <span class="tk-fn">fromRow</span><span class="tk-p">(</span>array <span class="tk-var">$row</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">static</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$model</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-keyword">static</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-var">$model</span>-&gt;title <span class="tk-p">=</span> (string) <span class="tk-p">(</span><span class="tk-var">$row</span><span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">]</span> ?? <span class="tk-string">&#039;&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-var">$model</span>-&gt;body <span class="tk-p">=</span> (string) <span class="tk-p">(</span><span class="tk-var">$row</span><span class="tk-p">[</span><span class="tk-string">&#039;body&#039;</span><span class="tk-p">]</span> ?? <span class="tk-string">&#039;&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-var">$model</span>-&gt;views <span class="tk-p">=</span> (int) <span class="tk-p">(</span><span class="tk-var">$row</span><span class="tk-p">[</span><span class="tk-string">&#039;views&#039;</span><span class="tk-p">]</span> ?? <span class="tk-num">0</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">return</span> <span class="tk-var">$model</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">toRow</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> array
+    <span class="tk-p">{</span>
+        <span class="tk-keyword">return</span> <span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-var">$this</span>-&gt;title<span class="tk-p">,</span> <span class="tk-string">&#039;body&#039;</span> =&gt; <span class="tk-var">$this</span>-&gt;body<span class="tk-p">,</span> <span class="tk-string">&#039;views&#039;</span> =&gt; <span class="tk-var">$this</span>-&gt;views<span class="tk-p">]</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p><code>fromRow()</code> and <code>toRow()</code> are the only two methods a model writes by hand — the same &ldquo;narrow once, at the boundary&rdquo; shape as <code>Connection::narrowRow()</code>, just per table instead of per driver. <code>--fields</code> writes both from a <code>name:type</code> list; edit them freely afterwards.</p>
+
+<h2>Wiring it up</h2>
+
+<p>Static finders need a connection without a container to resolve one from. Point every model at one, once, in <code>app/bootstrap.php</code> — right where <code>Connection</code> is already registered as a singleton:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$database</span> <span class="tk-p">=</span> <span class="tk-class">Connection</span>::<span class="tk-fn">connect</span><span class="tk-p">(</span><span class="tk-class">DatabaseSettings</span>::<span class="tk-fn">fromEnvironment</span><span class="tk-p">(</span><span class="tk-var">$env</span><span class="tk-p">,</span> <span class="tk-var">$root</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-class">Model</span>::<span class="tk-fn">useConnection</span><span class="tk-p">(</span><span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">singleton</span><span class="tk-p">(</span><span class="tk-class">Connection</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span> <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Connection</span> =&gt; <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>A second call throws — the same shape as registering a container service twice. This is boot-time wiring, not something a request should ever reach.</p>
+
+<h2>Reading</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-class">Note</span>::<span class="tk-fn">find</span><span class="tk-p">(</span><span class="tk-num">1</span><span class="tk-p">)</span><span class="tk-p">;</span>                              <span class="tk-comment">// ?Note</span>
+<span class="tk-class">Note</span>::<span class="tk-fn">findOrFail</span><span class="tk-p">(</span><span class="tk-num">1</span><span class="tk-p">)</span><span class="tk-p">;</span>                        <span class="tk-comment">// Note, or throws ModelNotFound</span>
+<span class="tk-class">Note</span>::<span class="tk-fn">all</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                                <span class="tk-comment">// list&lt;Note&gt;</span>
+<span class="tk-class">Note</span>::<span class="tk-fn">count</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                              <span class="tk-comment">// int</span>
+
+<span class="tk-class">Note</span>::<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;title&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;=&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;Hello&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>  <span class="tk-comment">// list&lt;Note&gt;</span>
+<span class="tk-class">Note</span>::<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;views&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;&gt;&#039;</span><span class="tk-p">,</span> <span class="tk-num">100</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">first</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>    <span class="tk-comment">// ?Note</span>
+
+<span class="tk-class">Note</span>::<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">where</span><span class="tk-p">(</span><span class="tk-string">&#039;views&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;&gt;&#039;</span><span class="tk-p">,</span> <span class="tk-num">10</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">orderBy</span><span class="tk-p">(</span><span class="tk-string">&#039;views&#039;</span><span class="tk-p">,</span> <span class="tk-class">Direction</span>::<span class="tk-class">Descending</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">limit</span><span class="tk-p">(</span><span class="tk-num">5</span><span class="tk-p">)</span>
+    -&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p><code>where()</code> and <code>query()</code> return a <code>ModelQuery</code> — the same fluent chain as <code>Query</code> (<code>whereNull()</code>, <code>whereIn()</code>, <code>orderBy()</code>, <code>limit()</code>, <code>offset()</code>, <code>affectingEveryRow()</code>), except <code>get()</code> and <code>first()</code> hydrate instances instead of handing back arrays. <code>update()</code> and <code>delete()</code> on a chain stay row-based — a bulk write over many rows has no single instance to return.</p>
+
+<h2>Writing</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$note</span> <span class="tk-p">=</span> <span class="tk-keyword">new</span> <span class="tk-fn">Note</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$note</span>-&gt;title <span class="tk-p">=</span> <span class="tk-string">&#039;Hello&#039;</span><span class="tk-p">;</span>
+<span class="tk-var">$note</span>-&gt;body <span class="tk-p">=</span> <span class="tk-string">&#039;World&#039;</span><span class="tk-p">;</span>
+<span class="tk-var">$note</span>-&gt;<span class="tk-fn">save</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>          <span class="tk-comment">// INSERT — $note-&gt;id is now set</span>
+
+<span class="tk-var">$note</span>-&gt;title <span class="tk-p">=</span> <span class="tk-string">&#039;Updated&#039;</span><span class="tk-p">;</span>
+<span class="tk-var">$note</span>-&gt;<span class="tk-fn">save</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>          <span class="tk-comment">// UPDATE, keyed on id — exists() is now true</span>
+
+<span class="tk-var">$note</span>-&gt;<span class="tk-fn">delete</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>        <span class="tk-comment">// DELETE, keyed on id</span></code></pre></figure>
+
+<p><code>exists()</code> tells the two cases apart: a freshly-<code>new</code>d instance inserts on <code>save()</code>, one loaded through <code>find()</code>/<code>all()</code>/<code>where()</code> updates. Calling <code>delete()</code> on an instance that was never saved throws — there is no row to remove.</p>
+
+<h2>Worker safety</h2>
+
+<p>A model's one static is the shared connection set by <code>useConnection()</code>. That is not the hazard <a href="architecture.html">the rest of this framework</a> forbids static state for: under a worker, <code>Connection</code> is already one object shared by every request in the process, and registering it as a container singleton carries the same sharing. Pointing <code>Model</code> at that same instance adds no new risk, because nothing <em>per request</em> is ever cached here &mdash; <code>find()</code>, <code>all()</code> and every <code>ModelQuery</code> terminal method build a fresh instance on every call. What would reintroduce the hazard &mdash; memoising a row, or a query result, on a static property &mdash; this class never does.</p>
+
+<h2>What a model is not</h2>
+
+<p>There are no relationships, no eager loading, no query scopes, and no events. A model past one table's worth of typed columns is <code>Connection::select()</code>'s job, the same as with the query builder:</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$rows</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">select</span><span class="tk-p">(</span>
+    <span class="tk-string">&#039;SELECT n.*, COUNT(c.id) AS comment_count
+       FROM notes n
+       LEFT JOIN comments c ON c.note_id = n.id
+      GROUP BY n.id&#039;</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+    </article>
+    <nav class="pager"><a href="migrations.html"><span>Previous</span>Migrations</a><a class="next" href="security.html"><span>Next</span>Security</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

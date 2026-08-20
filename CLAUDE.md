@@ -26,6 +26,7 @@ A PHP framework whose defining constraint is that **one application runs unchang
 ./orbit make:form Contact --controllers      # a form + the two pages that use it
 ./orbit make:middleware RequestId            # a Middleware class (registration printed, not inserted)
 ./orbit make:migration create_articles_table # generate a migration
+./orbit make:model Note --fields=title:string,body:string # a Model subclass (typed properties + fromRow/toRow)
 
 composer install
 cp .env.example .env                 # first run: configuration
@@ -54,7 +55,7 @@ vendor/bin/phpunit --filter test_name       # single test
 vendor/bin/phpunit tests/Unit/Http/UriTest.php
 ```
 
-Both gates pass clean: **743 tests** (20 of them integration tests that skip without a server), PHPStan max with no baseline and no `ignoreErrors`, over `src`, `tests`, `app`, `database`, `docs`, `orbit` and `public`.
+Both gates pass clean: **772 tests** (20 of them integration tests that skip without a server), PHPStan max with no baseline and no `ignoreErrors`, over `src`, `tests`, `app`, `database`, `docs`, `orbit` and `public`.
 
 `php -S localhost:8000 -t public` also works — it exercises the per-request path through `FpmSapi`, which makes it a quick way to check the *other* process model without installing nginx. It is not a supported deployment target.
 
@@ -100,7 +101,7 @@ src/Kernel/       Application (two-phase boundary) + Blueprint
 src/Session/      Session, SessionStore, FileSessionStore, SessionMiddleware
 src/Security/     Escaper, Csrf, CsrfMiddleware
 src/Auth/         Identity, UserProvider, PasswordHasher, Authenticator, LoginThrottle, RequireAuthentication
-src/Database/     Connection, Query + Identifier, Migrator + Migration, TransactionGuard
+src/Database/     Connection, Query + Identifier, Model + ModelQuery, Migrator + Migration, TransactionGuard
 src/View/         Compiler, Renderer, TemplateEngine
 src/Validation/   Validator
 src/Log/          Logger, StreamLogger, LogRequests
@@ -235,6 +236,16 @@ Files in `database/migrations/` named `<digits>_<lowercase_words>.php`, each ret
 
 `orbit serve` applies pending migrations as a development convenience. The production entrypoints never touch the schema: several workers booting at once would race.
 
+## Models
+
+`Database\Model` is an ActiveRecord-shaped layer over one table — `Note::find(1)`, `$note->save()`, `$note->delete()` — generated with `./orbit make:model Note --fields=title:string,views:int`. It is built entirely on `Query`: nothing on `Model` composes SQL of its own, and nothing here adds a capability `Query` does not already have. Joins, aggregates beyond `count()`, and relationships are still `Connection::select()`'s job — a model is a typed, mutable view of one table's rows, not a query language. This is a deliberate reversal of the query builder's own framing ("deliberately not an ORM"): that description is still true of `Query` itself, and stays true — `Model` is a second, optional layer on top of it, not a replacement.
+
+A generated model writes exactly two hand-editable methods, the same "narrow once, at the boundary" shape as `Connection::narrowRow()`: `fromRow(array $row): static` maps a database row onto typed properties, and `toRow(): array` is its inverse, read by `save()`. The primary key is always `id`, handled entirely by the base class — `fromRow()`/`toRow()` never touch it — matching the one spelling every generated migration already uses.
+
+The static finders (`find()`, `all()`, `where()`) need a `Connection` without a container to resolve one from, so there is exactly one static mutable property here: the shared connection, set once by `Model::useConnection($database)` — called in `app/bootstrap.php`, right where `Connection` is registered as a container singleton. A second call throws, the same shape as registering a container service twice. This is **not** the static-state hazard the rest of this framework forbids: under a worker, `Connection` is already one object shared by every request in the process, and pointing `Model` at that same instance adds no risk, because nothing *per request* is ever cached statically — `find()`, `all()` and every `ModelQuery` terminal method (`get()`, `first()`) build a fresh instance on every call. What would reintroduce the hazard — memoising a row or a query result on a static property — `Model` never does. `tests/Worker/StateIsolationTest.php` proves the second half of that claim (fresh instances, not shared ones) the same way it proves it for every other stateful piece here. `Model::resetConnectionForTesting()` exists solely so a test process that boots several applications in one PHP process (`ScaffoldTest`, `FormMakerTest`) is not stuck fighting over the one static — application code should never call it.
+
+`where()` and `query()` return a `ModelQuery`, the fluent counterpart to `Query` — same chain, but `get()`/`first()` hydrate instances instead of handing back arrays. `update()`/`delete()` on a chain stay row-based; a bulk write over many rows has no single instance to return.
+
 ## Admin UI
 
 `orbit ui` starts `Admin\AdminApplication` — a **second, independent `Kernel\Application`**, built by its own `boot()` in `src/Admin/AdminApplication.php`, never merged into `app/routes.php`. That separation is the whole design: a page that can run migrations, resend mail and wipe the template cache, if it were a few extra lines in the real route table, ships with every deployment unless a developer remembers to strip it back out — and "remembers to remove it" is not a security boundary. Its templates ship with the framework in `src/Admin/templates`, not `app/templates`, and its own `TemplateEngine`/cache directory (`storage/cache/admin-views`) never touches the project's compiled views.
@@ -287,6 +298,8 @@ Convention over configuration, minimum ceremony between install and a route retu
 `Console\MigrationMaker` writes a migration. The filename prefix is a **timestamp by default** — the migrator orders by filename, and timestamps are what let two branches add migrations without coordinating; `--sequential` gives the `0001` counter style instead. The name picks the starting contents (`create_x_table` → CREATE TABLE, `add_x_to_y` → ALTER, anything else → a blank pair), which is a convenience and never load-bearing. **Generated migrations use `$database->driver()->autoIncrementPrimaryKey()`**, so they are portable across all three engines from the start.
 
 Names are normalised freely (`CreateArticlesTable`, `create articles table`) because a name is words — but a path separator is refused rather than rewritten, since it means the caller was aiming somewhere. `--table` is validated as an identifier, because no driver can bind one.
+
+`Console\ModelMaker` writes a `Database\Model` subclass under `App\Models`, and — like `MigrationMaker` — only *guesses* the table name (a naive pluralisation of the class name); `--table=` overrides it, and `table()` in the generated class is the one line to edit if the guess is wrong. `--fields=name:type` is parsed by `Console\ModelFieldSpec` against a fixed set of PHP scalar types (`string`, `int`, `float`, `bool`, `?`-prefixable), a different vocabulary from `FormFieldSpec`'s on purpose: a model field names storage, not an input. Each field writes three matching lines — a typed, defaulted property; one `fromRow()` line; one `toRow()` line — so a property can never exist without both halves of the mapping that fills it. Like `ClassMaker`, there is no lifetime and no registration: a model is reached through its own static finders, never resolved from the container, so the command prints the one thing it does not write instead — the `Model::useConnection($database)` line for `app/bootstrap.php`.
 
 `Console\ClassMaker` writes a plain class under `App\` — the everything-else case, since most of an application is neither a controller nor a migration. **The lifetime is an argument, not an afterthought**: `Console\Lifetime` defaults to `Autowired`, which registers nothing and therefore cannot leak, while `--singleton` and `--scoped` print the `app/bootstrap.php` line and put the constraint that choice carries into the generated class comment. The two flags are mutually exclusive, and `Lifetime::fromFlags()` refuses the pair — in `src/`, so both copies of the `orbit` script cannot disagree about it.
 

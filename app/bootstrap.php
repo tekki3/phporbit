@@ -34,6 +34,7 @@ use PhpOrbit\Crypto\Signer;
 use PhpOrbit\Database\Connection;
 use PhpOrbit\Database\DatabaseSettings;
 use PhpOrbit\Database\Migrator;
+use PhpOrbit\Database\Model;
 use PhpOrbit\Database\TransactionGuard;
 use PhpOrbit\Kernel\Application;
 use PhpOrbit\Kernel\Blueprint;
@@ -82,6 +83,13 @@ return Application::boot(
         // here so a bad host or a missing database name stops the application
         // starting rather than failing on whichever request queries first.
         $database = Connection::connect(DatabaseSettings::fromEnvironment($env, $root));
+
+        // Points every Model subclass at the same connection registered
+        // below. Safe under a worker for the same reason the singleton
+        // registration is: one Connection, shared by every request in the
+        // process, never a per-request value cached statically.
+        Model::useConnection($database);
+
         // Not the STDERR constant: it exists only under the CLI SAPI, and this
         // file has to boot identically on all four targets.
         $logger = StreamLogger::standardError(Level::fromName($env->string('LOG_LEVEL', 'info')));

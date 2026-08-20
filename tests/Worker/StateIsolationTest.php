@@ -6,6 +6,7 @@ namespace PhpOrbit\Tests\Worker;
 
 use PhpOrbit\Container\Container;
 use PhpOrbit\Container\RequestScope;
+use PhpOrbit\Database\Connection;
 use PhpOrbit\Http\Response;
 use PhpOrbit\Http\ServerRequest;
 use PhpOrbit\Http\Status;
@@ -16,6 +17,7 @@ use PhpOrbit\Session\SessionMiddleware;
 use PhpOrbit\Tests\Support\ArraySessionStore;
 use PhpOrbit\Tests\Support\Counter;
 use PhpOrbit\Tests\Support\Requests;
+use PhpOrbit\Tests\Support\Widget;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -79,6 +81,60 @@ final class StateIsolationTest extends TestCase
 
         self::assertSame('1', $app->handle(Requests::get('/count'))->body);
         self::assertSame('2', $app->handle(Requests::get('/count'))->body);
+    }
+
+    /**
+     * Model's one static, the shared Connection, is deliberately as shared as
+     * a container singleton — that is what the comment on Model::connection()
+     * claims, and this is what proves it rather than just asserting it. Two
+     * requests write to the same table, the way two requests share any other
+     * singleton-backed store; what must never happen is a row from one
+     * request read by name and mutated by the other still being *the same
+     * object* the next find() hands back — that would mean a request was
+     * caching a hydrated instance somewhere shared, which nothing here does.
+     */
+    public function test_model_shares_its_connection_like_a_singleton_but_hydrates_a_fresh_instance_every_time(): void
+    {
+        $db = Connection::sqlite(':memory:');
+        $db->executeSchema(
+            'CREATE TABLE widgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, quantity INTEGER NOT NULL)',
+        );
+
+        Widget::resetConnectionForTesting();
+        Widget::useConnection($db);
+
+        try {
+            $app = Application::boot(static function (Blueprint $app): void {
+                $app->routes->get('/widgets/{name}', static function (ServerRequest $r): Response {
+                    $widget = new Widget();
+                    $widget->name = (string) $r->attribute('name');
+                    $widget->quantity = 1;
+                    $widget->save();
+
+                    return Response::text((string) $widget->id);
+                });
+
+                $app->routes->get('/widgets-count', static fn (): Response => Response::text(
+                    (string) Widget::count(),
+                ));
+            });
+
+            self::assertSame('1', $app->handle(Requests::get('/widgets/first'))->body);
+            self::assertSame('1', $app->handle(Requests::get('/widgets-count'))->body);
+
+            self::assertSame('2', $app->handle(Requests::get('/widgets/second'))->body);
+            self::assertSame('2', $app->handle(Requests::get('/widgets-count'))->body);
+
+            // Reading the same row twice, from two different "requests" (two
+            // separate find() calls), must never hand back the same instance
+            // — that would be exactly the kind of shared, mutable object this
+            // suite exists to catch.
+            $first = Widget::findOrFail(1);
+            $second = Widget::findOrFail(1);
+            self::assertNotSame($first, $second);
+        } finally {
+            Widget::resetConnectionForTesting();
+        }
     }
 
     /**

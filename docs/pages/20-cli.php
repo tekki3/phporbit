@@ -20,6 +20,7 @@ Usage:
                          [--no-honeypot] [--controllers] [--force]
   orbit make:middleware <Name> [--force]
   orbit make:migration <name> [--table=x] [--sequential] [--force]
+  orbit make:model <Name> [--table=x] [--fields=a:string,b:int] [--force]
   orbit serve [--host=127.0.0.1] [--port=8080] [--debug]
   orbit ui [--host=127.0.0.1] [--port=8081] [--debug]
   orbit routes
@@ -477,6 +478,50 @@ Invalid table name "a; DROP TABLE users". Identifiers may contain letters, digit
 [[/bash]]
 
 <p>Punctuation and casing in a <em>name</em> are normalised freely, because a name is words. A path separator is not: it means the caller was aiming somewhere, and quietly rewriting it would hide that rather than answer it. The table name is validated rather than escaped, because no driver can bind an identifier — it reaches the SQL directly.</p>
+
+<h2>make:model</h2>
+
+[[bash]]
+$ orbit make:model Note --fields=title:string,body:string,views:int
+Created app/src/Models/Note.php
+
+App\Models\Note — table "notes", 3 fields
+
+Once, in app/bootstrap.php, right after $database is built:
+
+  use PhpOrbit\Database\Model;
+  Model::useConnection($database);
+
+Then use it directly — no injection, no registration:
+
+  use App\Models\Note;
+  App\Models\Note::find($id);
+[[/bash]]
+
+<p>Writes a <a href="models.html">Model</a> subclass under <code>App\Models</code> — a typed property and matching <code>fromRow()</code>/<code>toRow()</code> line per field. There is no lifetime flag: a model is never resolved from the container, so there is nothing to register.</p>
+
+<p>The table name is guessed from the class — <code>Note</code> becomes <code>notes</code>, <code>Category</code> becomes <code>categories</code> — and is only a starting point; <code>--table=</code> overrides it, and <code>table()</code> in the generated class is the one line to edit if the guess is wrong.</p>
+
+[[bash]]
+$ orbit make:model Note --fields=title:string,views:int,archived_at:?string
+[[/bash]]
+
+<div class="scroller">
+<table>
+<thead><tr><th>Type</th><th>Property</th></tr></thead>
+<tbody>
+<tr><td><code>string</code></td><td><code>public string $x = '';</code></td></tr>
+<tr><td><code>int</code></td><td><code>public int $x = 0;</code></td></tr>
+<tr><td><code>float</code></td><td><code>public float $x = 0.0;</code></td></tr>
+<tr><td><code>bool</code></td><td><code>public bool $x = false;</code></td></tr>
+<tr><td>any of the above, <code>?</code>-prefixed</td><td><code>public ?T $x = null;</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Unlike <code>make:form</code>'s field types, these name storage rather than an input — a model field is a column, not a control. <code>--fields</code> is optional; without it, the generated class has no properties beyond <code>id</code> and a comment showing the flag to add them.</p>
+
+<p>Every generated model needs <code>Model::useConnection()</code> called once, which the command prints but does not write — the same reasoning <code>make:controller</code> leaves the route line to paste rather than editing a file it does not own.</p>
 
 <h2>serve</h2>
 

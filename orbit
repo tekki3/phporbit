@@ -22,6 +22,7 @@ use PhpOrbit\Console\FormMaker;
 use PhpOrbit\Console\Lifetime;
 use PhpOrbit\Console\MiddlewareMaker;
 use PhpOrbit\Console\MigrationMaker;
+use PhpOrbit\Console\ModelMaker;
 use PhpOrbit\Console\Scaffold;
 use PhpOrbit\Console\Variant;
 use PhpOrbit\Crypto\Key;
@@ -94,6 +95,7 @@ Usage:
                          [--no-honeypot] [--controllers] [--force]
   orbit make:middleware <Name> [--force]
   orbit make:migration <name> [--table=x] [--sequential] [--force]
+  orbit make:model <Name> [--table=x] [--fields=a:string,b:int] [--force]
   orbit serve [--host=127.0.0.1] [--port=8080] [--debug]
   orbit ui [--host=127.0.0.1] [--port=8081] [--debug]
   orbit routes
@@ -387,6 +389,54 @@ try {
         }
 
         echo PHP_EOL . 'Edit it, then run: orbit migrate' . PHP_EOL;
+        exit(0);
+
+    case 'make:model':
+        // Generates source; there is no reason to boot the application first.
+        $name = null;
+        foreach (array_slice($arguments, 1) as $argument) {
+            if (is_string($argument) && !str_starts_with($argument, '--')) {
+                $name = $argument;
+                break;
+            }
+        }
+
+        if ($name === null) {
+            fwrite(STDERR, 'Which model? Try: orbit make:model Note --fields=title:string,body:string' . PHP_EOL);
+            exit(1);
+        }
+
+        try {
+            $made = (new ModelMaker($root, static function (string $line): void {
+                echo $line . PHP_EOL;
+            }))->create(
+                $name,
+                table: $options['table'] ?? null,
+                fields: $options['fields'] ?? null,
+                force: isset($options['force']),
+            );
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        printf(
+            "\n%s — table \"%s\", %d field%s\n",
+            $made->className,
+            $made->table,
+            count($made->fieldNames),
+            count($made->fieldNames) === 1 ? '' : 's',
+        );
+
+        // Not called automatically: Model::useConnection() is boot-time
+        // wiring, and this script does not edit app/bootstrap.php for the
+        // same reason make:controller does not edit app/routes.php.
+        echo PHP_EOL . 'Once, in app/bootstrap.php, right after $database is built:' . PHP_EOL . PHP_EOL;
+        echo '  use PhpOrbit\Database\Model;' . PHP_EOL;
+        echo '  Model::useConnection($database);' . PHP_EOL;
+        echo PHP_EOL . 'Then use it directly — no injection, no registration:' . PHP_EOL . PHP_EOL;
+        echo '  ' . $made->importSnippet . PHP_EOL;
+        echo '  ' . $made->className . '::find($id);' . PHP_EOL;
         exit(0);
 
     case 'serve':

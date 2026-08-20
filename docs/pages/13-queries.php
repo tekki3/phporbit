@@ -7,7 +7,7 @@ return [
     'title' => 'Query builder',
     'summary' => 'A deliberately thin fluent builder — with two safety rules that will stop you at least once.',
     'body' => <<<'HTML'
-<p>The builder composes SQL with bound placeholders so common cases read well. It is not an ORM, and it does not try to be: hand-written SQL through <code>Connection::select()</code> is the escape hatch and the better tool for joins, window functions and CTEs.</p>
+<p>The builder composes SQL with bound placeholders so common cases read well. It is not an ORM, and it does not try to be: hand-written SQL through <code>Connection::select()</code> is the escape hatch and the better tool for joins, window functions and CTEs. For a typed, per-table view built on top of this builder &mdash; <code>Note::find(1)</code>, <code>$note->save()</code> &mdash; see <a href="models.html">Models</a>.</p>
 
 [[php]]
 <?php

@@ -10,6 +10,7 @@ use PhpOrbit\Console\FormMaker;
 use PhpOrbit\Console\Scaffold;
 use PhpOrbit\Console\Variant;
 use PhpOrbit\Crypto\Key;
+use PhpOrbit\Database\Model;
 use PhpOrbit\Crypto\Signer;
 use PhpOrbit\Form\Form;
 use PhpOrbit\Http\Status;
@@ -388,6 +389,11 @@ final class FormMakerTest extends TestCase
 
         $previousLevel = getenv('LOG_LEVEL');
         putenv('LOG_LEVEL=error');
+
+        // Model::useConnection() is boot-time wiring; a real deployment calls
+        // it once, but this test process boots several scaffolded apps in a
+        // row, and each is entitled to point Model at its own connection.
+        Model::resetConnectionForTesting();
 
         try {
             /** @var Application $application */

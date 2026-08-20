@@ -76,6 +76,24 @@ the `app/bootstrap.php` line to paste.
   spell it differently. Index `VARCHAR`, not `TEXT` (MySQL cannot index `TEXT`).
 - `down()` is required. Throw `IrreversibleMigration` if a change cannot be undone.
 
+## Models
+
+`Note::find(1)`, `$note->save()`, `$note->delete()`, `Note::where(...)->get()` —
+`./orbit make:model Note --fields=title:string,views:int` writes one. Built
+entirely on the query builder above; nothing on `Model` composes SQL of its
+own. No relationships, no eager loading, no scopes, no events — anything past
+one table's typed columns is still `Connection::select()`. Not registered in
+`app/bootstrap.php` and never resolved from the container — a model is reached
+through its own static finders, not injected.
+
+`Model::useConnection($database)` is called once, in `app/bootstrap.php`, right
+next to where `Connection` is registered as a singleton — `make:model` prints
+the line rather than writing it. That is the **one** exception to "no static
+mutable properties" above: it is safe for the same reason the singleton
+registration next to it is safe — one `Connection`, shared by every request in
+the process either way. Do not call it a second time, and do not add a second
+static anywhere else on `Model`'s account.
+
 ## Mail
 
 `Message::to(...)->subject(...)->text(...)`, sent through the injected `Mailer`.
@@ -114,7 +132,7 @@ at boot in `app/bootstrap.php` and pass concrete values into services.
 Do not invent these; they are not part of the framework:
 
 - Facades or global helpers (`Route::get()`, `view()`, `config()`, `env()`, `dd()`)
-- An ORM, models, relationships, or `Model::find()`
+- Relationships, eager loading, query scopes, or events on `Model` — see Models above
 - Encrypted model attributes, or asymmetric crypto
 - Blade, Twig, or `@csrf` / `@auth` directives
 - Service providers, events, queues, or a scheduler
@@ -136,6 +154,7 @@ Do not invent these; they are not part of the framework:
 ./orbit make:form Name [--fields=a:text] [--captcha] [--controllers]
 ./orbit make:middleware Name             # prints the $app->middleware(...) entry to place
 ./orbit make:migration create_x_table
+./orbit make:model Name [--fields=a:string,b:int]  # prints the Model::useConnection() line to place
 ./orbit migrate | migrate:status | migrate:rollback
 ./orbit storage:clear                    # wipe storage/cache/views (safe: recompiles on next render)
 ./orbit sessions:gc                      # delete expired session files
