@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# git post-commit hook: syncs phporbit-app after every commit on this repo.
+# Installed into .git/hooks/post-commit by scripts/install-hooks.sh (hooks
+# live outside git's own tracked tree, so the real logic stays in
+# scripts/sync-phporbit-app.sh where it's versioned).
+#
+# Skip once with: SKIP_ORBIT_SYNC=1 git commit ...
+set -uo pipefail
+
+if [ -n "${SKIP_ORBIT_SYNC:-}" ]; then
+    exit 0
+fi
+
+root="$(git rev-parse --show-toplevel)"
+"$root/scripts/sync-phporbit-app.sh" || echo "[post-commit] sync-phporbit-app.sh failed - the commit itself is fine, sync just didn't happen" >&2
+exit 0
