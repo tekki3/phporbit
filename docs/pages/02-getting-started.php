@@ -15,6 +15,20 @@ return [
 <li><code>sockets</code> and <code>pcntl</code> for the built-in server (present in most CLI builds).</li>
 </ul>
 
+<h2>Installing the CLI</h2>
+
+<p>Every project ends up with its own copy of <code>orbit</code> at its root, and that copy is what <code>./orbit serve</code>, <code>./orbit migrate</code> and the rest run through. To get a bare <code>orbit</code> command for scaffolding new projects before one exists, install it globally with Composer:</p>
+
+[[bash]]
+$ composer global require phporbit/phporbit
+$ export PATH="$(composer global config bin-dir --absolute):$PATH"   # add this line to your shell profile
+[[/bash]]
+
+<div class="note">
+<b>What this global install is for</b>
+<p><code>orbit new</code> and <code>orbit key:generate</code> are the only commands it makes sense to run this way — neither needs a project to already exist. Every other command resolves paths against the project it belongs to, so those stay <code>./orbit ...</code>, run from inside a scaffolded project's own directory. See <a href="cli.html">The orbit CLI</a>.</p>
+</div>
+
 <h2>Starting a project</h2>
 
 [[bash]]

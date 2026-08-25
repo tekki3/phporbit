@@ -679,6 +679,18 @@ Accepted values: true/false, 1/0, yes/no, on/off.</code></pre></figure>
 <figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>php /srv/app/orbit migrate</code></pre></figure>
 
 <p>Paths are resolved from the script's own location and, for settings, against the project root — so a command behaves the same from cron, a deploy script or your shell, regardless of the working directory.</p>
+
+<h3>A global install</h3>
+
+<p>That same rule means a globally installed <code>orbit</code> cannot run <code>serve</code>, <code>migrate</code> or any other project command for whatever project happens to be in your current directory — it would resolve paths against the global install itself, not your project. The one thing worth installing globally is <code>new</code>, which takes its target directory from where you run it rather than from its own location:</p>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>composer global require phporbit/phporbit
+<span class="tk-p">$ </span>export PATH=&quot;$(composer global config bin-dir --absolute):$PATH&quot;
+
+<span class="tk-p">$ </span>cd ~/code
+<span class="tk-p">$ </span>orbit new my-app</code></pre></figure>
+
+<p><code>key:generate</code> works the same way, for the same reason — it prints a key and touches no files. Once a project exists, use its own <code>./orbit</code> for everything else.</p>
     </article>
     <nav class="pager"><a href="mail.html"><span>Previous</span>Sending email</a><a class="next" href="admin-ui.html"><span>Next</span>The admin UI</a></nav>
     <footer class="site-footer">

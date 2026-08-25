@@ -737,5 +737,19 @@ $ php /srv/app/orbit migrate
 [[/bash]]
 
 <p>Paths are resolved from the script's own location and, for settings, against the project root — so a command behaves the same from cron, a deploy script or your shell, regardless of the working directory.</p>
+
+<h3>A global install</h3>
+
+<p>That same rule means a globally installed <code>orbit</code> cannot run <code>serve</code>, <code>migrate</code> or any other project command for whatever project happens to be in your current directory — it would resolve paths against the global install itself, not your project. The one thing worth installing globally is <code>new</code>, which takes its target directory from where you run it rather than from its own location:</p>
+
+[[bash]]
+$ composer global require phporbit/phporbit
+$ export PATH="$(composer global config bin-dir --absolute):$PATH"
+
+$ cd ~/code
+$ orbit new my-app
+[[/bash]]
+
+<p><code>key:generate</code> works the same way, for the same reason — it prints a key and touches no files. Once a project exists, use its own <code>./orbit</code> for everything else.</p>
 HTML,
 ];
