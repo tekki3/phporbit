@@ -103,7 +103,9 @@ final class Route
     {
         if (!class_exists($handler)) {
             throw new InvalidRoutePattern(sprintf(
-                'Route "%s" refers to handler class "%s", which does not exist.',
+                'Route "%s" refers to handler class "%s", which does not exist. '
+                . 'If the class exists on disk, the autoloader likely needs regenerating: '
+                . 'run composer dump-autoload.',
                 $pattern,
                 $handler,
             ));

@@ -33,6 +33,7 @@ use PhpOrbit\Mail\MailFailed;
 use PhpOrbit\Mail\MailStatus;
 use PhpOrbit\Mail\Message;
 use PhpOrbit\Mail\PersistingMailer;
+use PhpOrbit\Routing\Exception\InvalidRoutePattern;
 use PhpOrbit\Sapi\OrbitServer;
 use PhpOrbit\Session\FileSessionStore;
 
@@ -778,5 +779,11 @@ try {
     // A configuration mistake is the user's to fix, not a crash to debug: show
     // the message plainly rather than a stack trace through the container.
     fwrite(STDERR, 'Configuration error: ' . $e->getMessage() . PHP_EOL);
+    exit(1);
+} catch (InvalidRoutePattern $e) {
+    // Same reasoning as the configuration errors above: a route that fails to
+    // compile at boot is the user's app/routes.php or autoloader to fix, not
+    // a framework crash to debug through a stack trace.
+    fwrite(STDERR, 'Routing error: ' . $e->getMessage() . PHP_EOL);
     exit(1);
 }
