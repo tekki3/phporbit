@@ -49,9 +49,11 @@ final class Migrator
      */
     public function prepare(): void
     {
+        // VARCHAR rather than TEXT: this column is the primary key, and MySQL
+        // cannot index TEXT without a prefix length.
         $this->database->executeSchema(sprintf(
             'CREATE TABLE IF NOT EXISTS %s (
-                name TEXT PRIMARY KEY,
+                name VARCHAR(191) PRIMARY KEY,
                 batch INTEGER NOT NULL,
                 applied_at TEXT NOT NULL
             )',

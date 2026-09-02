@@ -221,6 +221,13 @@ final class Connection
     /**
      * Runs work inside a transaction, rolling back if it throws.
      *
+     * MySQL commits implicitly on DDL (see {@see Driver::supportsTransactionalDdl()}),
+     * so work containing a `CREATE`/`ALTER`/`DROP` there can end the transaction
+     * before this method calls `commit()`. Checking `inTransaction()` first,
+     * the same guard the catch branch already uses, avoids turning that into a
+     * spurious "there is no active transaction" failure on an otherwise
+     * successful call.
+     *
      * @template T
      * @param Closure(self): T $work
      * @return T
@@ -231,7 +238,10 @@ final class Connection
 
         try {
             $result = $work($this);
-            $this->pdo->commit();
+
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->commit();
+            }
 
             return $result;
         } catch (Throwable $e) {
