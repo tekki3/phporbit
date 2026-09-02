@@ -20,6 +20,7 @@ declare(strict_types=1);
 
 use App\Auth\DatabaseUserProvider;
 use App\Controllers\StoreAvatarController;
+use App\Middleware\HtmlErrorPages;
 use App\Support\ScopedProbe;
 use App\Support\WorkerStats;
 use PhpOrbit\Auth\Authenticator;
@@ -181,10 +182,12 @@ return Application::boot(
 
         $cacheSeconds = $debug ? 0 : 3600;
 
-        // Order matters. Logging is outermost so it times everything; static
-        // files short-circuit before any session work; CSRF must follow the
-        // session that holds its token.
+        // Order matters. HtmlErrorPages is outermost so LogRequests — next in
+        // line — still records a thrown exception's full detail before it is
+        // turned into an opaque page; static files short-circuit before any
+        // session work; CSRF must follow the session that holds its token.
         $middleware = [
+            new HtmlErrorPages($templates, $debug),
             new LogRequests($logger),
             new ServeStaticFiles($root . '/public', maxAgeSeconds: $cacheSeconds),
         ];

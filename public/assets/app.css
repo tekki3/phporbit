@@ -287,6 +287,19 @@ p:last-child { margin-bottom: 0; }
 .card + .card { margin-top: .85rem; }
 .card code { color: var(--ink); background: var(--panel-2); padding: .12rem .4rem; border-radius: 5px; border: 1px solid var(--line); font-size: .86em; }
 
+/* A debug-only exception trace on the demo's error pages. */
+.trace {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    margin-top: .75rem;
+    font-family: var(--mono);
+    font-size: .84rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .note { color: var(--muted); font-size: .9rem; margin-top: 1.25rem; }
 .note code { color: var(--ink); background: var(--panel-2); padding: .12rem .35rem; border-radius: 4px; }
 

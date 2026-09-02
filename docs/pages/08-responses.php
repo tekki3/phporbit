@@ -168,5 +168,10 @@ Internal Server Error
 [[/text]]
 
 <p>With <code>--debug</code>, the class, message, file, line and stack trace are rendered instead. Exception messages routinely contain file paths, SQL and credentials, which is why that is opt-in and never the default.</p>
+
+<div class="note">
+<b>The demo dresses this up</b>
+<p><code>src/</code> has no knowledge of an application's templates, so this stays text. The demo app layers an HTML page on top as ordinary middleware — <code>App\Middleware\HtmlErrorPages</code>, registered first in <code>app/bootstrap.php</code> — which renders <code>app/templates/errors/error.orbit.php</code> for a 400, 403, 404, 405 or 500, and passes every other status through untouched (the JSON 401 <code>RequireAuthentication</code> sends to a non-browser client included). It is a pattern any application can copy, not a framework feature.</p>
+</div>
 HTML,
 ];
