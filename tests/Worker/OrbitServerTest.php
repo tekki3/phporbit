@@ -66,7 +66,11 @@ final class OrbitServerTest extends TestCase
         }
 
         if (is_resource($this->process)) {
-            proc_terminate($this->process, SIGTERM);
+            // No explicit signal: SIGTERM is only defined when ext-pcntl is
+            // loaded, which Windows builds never ship. proc_terminate()'s own
+            // default is already 15 (SIGTERM), so passing nothing behaves
+            // identically on POSIX and is portable everywhere else too.
+            proc_terminate($this->process);
             proc_close($this->process);
         }
 
