@@ -21,10 +21,10 @@
     <div class="panel">
         <h2>Send a test message</h2>
         <p class="panel-lede">
-            Sends one real message through the configured driver
+            Submits one test message through the configured driver
             (<code>MAIL_DRIVER={{ $mailDriver }}</code>) — the same as
-            <code>orbit mail:test</code>. Logged like any other send, so a
-            failure can be resent from <a href="/mail">Mail</a> once fixed.
+            <code>orbit mail:test</code>. With <code>MAIL_QUEUE=true</code>,
+            delivery is deferred to <code>orbit mail:send-pending</code>.
         </p>
 
         @if($mailResult ?? null)

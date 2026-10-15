@@ -18,10 +18,8 @@ use PhpOrbit\Session\Session;
 use PhpOrbit\View\TemplateEngine;
 
 /**
- * The same as `orbit mail:test`: one real message through whatever
- * MAIL_DRIVER is configured, going through the same PersistingMailer every
- * controller uses — so a failure here is one more row in /mail, resendable
- * from there once whatever was wrong is fixed.
+ * The same as `orbit mail:test`: one message through the configured driver,
+ * or into mail_log as pending when MAIL_QUEUE is enabled.
  */
 final class SendTestMailController implements Handler
 {
@@ -38,6 +36,7 @@ final class SendTestMailController implements Handler
         $to = trim($request->form('to') ?? '');
         $from = trim($request->form('from') ?? '') ?: ($this->env->raw('MAIL_FROM_ADDRESS') ?? '');
         $driver = $this->env->string('MAIL_DRIVER', 'array');
+        $queued = $this->mailer->queuesMessages();
 
         $base = [
             'title' => 'Tools',
@@ -63,13 +62,20 @@ final class SendTestMailController implements Handler
             $message = Message::to($to)
                 ->from($from)
                 ->subject('phporbit test message')
-                ->text(sprintf(
-                    "Sent from the admin UI at %s, through the %s driver.\n\n"
-                    . "If this arrived, MAIL_DRIVER=%s is delivering mail correctly.",
-                    gmdate('c'),
-                    $driver,
-                    $driver,
-                ));
+                ->text($queued
+                    ? sprintf(
+                        "Queued from the admin UI at %s, through the %s driver.\n\n"
+                        . "Run `orbit mail:send-pending` to deliver this message.",
+                        gmdate('c'),
+                        $driver,
+                    )
+                    : sprintf(
+                        "Sent from the admin UI at %s, through the %s driver.\n\n"
+                        . "If this arrived, MAIL_DRIVER=%s is delivering mail correctly.",
+                        gmdate('c'),
+                        $driver,
+                        $driver,
+                    ));
         } catch (InvalidArgumentException $e) {
             return $this->view->respond('tools', [
                 ...$base,
@@ -88,9 +94,11 @@ final class SendTestMailController implements Handler
             ], Status::UnprocessableEntity);
         }
 
-        $result = in_array($driver, ['array', 'memory', 'null'], true)
-            ? sprintf('Accepted by the "%s" driver — nothing left this machine.', $driver)
-            : sprintf('Sent to %s via %s.', $to, $driver);
+        $result = $queued
+            ? sprintf('Queued for delivery to %s. Run orbit mail:send-pending to deliver it.', $to)
+            : (in_array($driver, ['array', 'memory', 'null'], true)
+                ? sprintf('Accepted by the "%s" driver — nothing left this machine.', $driver)
+                : sprintf('Sent to %s via %s.', $to, $driver));
 
         return $this->view->respond('tools', [
             ...$base,

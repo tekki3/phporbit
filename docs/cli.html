@@ -48,7 +48,8 @@ Usage:
   orbit migrate:rollback [--batches=1]
   orbit db:seed
   orbit mail:test --to=x@example.test [--from=x@example.test]
-  orbit mail:list [--status=sent|failed] [--limit=20]
+  orbit mail:list [--status=sent|failed|pending] [--limit=20]
+  orbit mail:send-pending [--limit=50]
   orbit mail:resend &lt;id&gt;|--failed [--limit=50]
   orbit storage:clear
   orbit sessions:gc
@@ -577,23 +578,34 @@ Accepted by the &quot;array&quot; driver — nothing left this machine. Set MAIL
 <span class="tk-p">$ </span>MAIL_DRIVER=smtp ./orbit mail:test --to=you@example.test
 Sent to you@example.test via smtp.
 
+<span class="tk-p">$ </span>MAIL_QUEUE=true ./orbit mail:test --to=you@example.test
+Queued for delivery to you@example.test.
+
 <span class="tk-p">$ </span>./orbit mail:test --to=you@example.test
 Send failed (driver: smtp): Could not connect to tcp://smtp.example.test:587: ...</code></pre></figure>
 
 <p>The sender comes from <code>MAIL_FROM_ADDRESS</code> by default; <code>--from=</code> overrides it, and the command refuses outright if neither is set — a test send needs a sender the same as any other. Read directly from configuration rather than left to the mailer's own default, because only <code>SmtpMailer</code> applies one; <code>mail:test</code> has to behave the same way regardless of driver.</p>
 
-<p>The send goes through the same <code>Mailer</code> every controller uses — see <a href="mail.html">Every send is persisted</a> — so a test message is one more row in <code>orbit mail:list</code>, and a failed one is resendable with <code>orbit mail:resend</code> once whatever was wrong is fixed, without composing a new message by hand.</p>
+<p>The message goes through the same <code>Mailer</code> every controller uses — see <a href="mail.html">Every send is persisted</a> — so it is one more row in <code>orbit mail:list</code>. With <code>MAIL_QUEUE=true</code> it remains pending until <code>mail:send-pending</code> runs; otherwise it is delivered immediately and a failed send is resendable with <code>orbit mail:resend</code>.</p>
 
 <h2>mail:list</h2>
 
 <figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit mail:list
 5     sent    2    carol@example.test                 Reminder 2                               2026-01-01T09:14:11+00:00
 4     failed  1    bob@example.test                   Reminder                                 2026-01-01T09:14:02+00:00
-3     sent    1    grace@example.test                 Receipt                                  2026-01-01T09:12:44+00:00
+3     pending 0    grace@example.test                 Receipt                                  2026-01-01T09:12:44+00:00
 
 <span class="tk-p">$ </span>./orbit mail:list --status=failed --limit=5</code></pre></figure>
 
-<p>Every message sent through <code>Mailer</code> is recorded — see <a href="mail.html">Sending email</a> for what <code>mail_log</code> holds — and this is how to read that log back: id, status, attempts, recipients, subject, last-updated, most recent first. <code>--status</code> narrows to <code>sent</code> or <code>failed</code>; <code>--limit</code> defaults to 20.</p>
+<p>Every message passed through <code>Mailer</code> is recorded — see <a href="mail.html">Sending email</a> for what <code>mail_log</code> holds — and this is how to read that log back: id, status, attempts, recipients, subject, last-updated, most recent first. <code>--status</code> narrows to <code>sent</code>, <code>failed</code> or <code>pending</code>; <code>--limit</code> defaults to 20.</p>
+
+<h2>mail:send-pending</h2>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit mail:send-pending --limit=50
+Sent #3
+1 sent, 0 failed.</code></pre></figure>
+
+<p>Sends up to 50 pending messages (or the requested <code>--limit</code>) synchronously through the configured mail driver. Each row is updated in place to <code>sent</code> or <code>failed</code>, and failed rows retain the server error. The command continues after individual failures and exits non-zero if any remain failed. Use a system scheduler to run it periodically; phporbit does not run a worker or retry automatically.</p>
 
 <h2>mail:resend</h2>
 

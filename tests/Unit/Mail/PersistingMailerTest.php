@@ -6,6 +6,7 @@ namespace PhpOrbit\Tests\Unit\Mail;
 
 use InvalidArgumentException;
 use PhpOrbit\Database\Connection;
+use PhpOrbit\Mail\Address;
 use PhpOrbit\Mail\ArrayMailer;
 use PhpOrbit\Mail\MailFailed;
 use PhpOrbit\Mail\MailLogRepository;
@@ -13,6 +14,9 @@ use PhpOrbit\Mail\Mailer;
 use PhpOrbit\Mail\MailStatus;
 use PhpOrbit\Mail\Message;
 use PhpOrbit\Mail\PersistingMailer;
+use PhpOrbit\Mail\SmtpEncryption;
+use PhpOrbit\Mail\SmtpMailer;
+use PhpOrbit\Mail\SmtpSettings;
 use PHPUnit\Framework\TestCase;
 
 final class PersistingMailerTest extends TestCase
@@ -62,6 +66,89 @@ final class PersistingMailerTest extends TestCase
         $logged = $this->repository->list();
         self::assertCount(1, $logged);
         self::assertSame(MailStatus::Sent, $logged[0]->status);
+    }
+
+    public function test_queue_mode_persists_pending_without_calling_the_inner_mailer(): void
+    {
+        $inner = new ArrayMailer();
+        $mailer = new PersistingMailer($inner, $this->repository, queue: true);
+        $message = Message::to('ada@example.test')->from('a@b.test')->subject('Hi')->text('Hi');
+
+        $mailer->send($message);
+
+        self::assertSame(0, $inner->count());
+        $logged = $this->repository->list(MailStatus::Pending);
+        self::assertCount(1, $logged);
+        self::assertSame(MailStatus::Pending, $logged[0]->status);
+        self::assertSame(0, $logged[0]->attempts);
+        self::assertTrue($mailer->queuesMessages());
+    }
+
+    public function test_queue_mode_still_validates_messages_before_persisting(): void
+    {
+        $mailer = new PersistingMailer(new ArrayMailer(), $this->repository, queue: true);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $mailer->send(Message::create()->subject('No recipients'));
+    }
+
+    public function test_queue_mode_applies_the_smtp_default_sender_before_persisting(): void
+    {
+        $inner = new SmtpMailer(new SmtpSettings(
+            'smtp.example.test',
+            encryption: SmtpEncryption::None,
+            from: new Address('no-reply@example.test'),
+        ));
+        $mailer = new PersistingMailer($inner, $this->repository, queue: true);
+
+        $mailer->send(Message::to('ada@example.test')->subject('Hi')->text('Hi'));
+
+        $entry = $this->repository->list(MailStatus::Pending)[0];
+        self::assertSame('no-reply@example.test', $entry->from?->email);
+    }
+
+    public function test_pending_mail_is_delivered_and_updated_in_place(): void
+    {
+        $inner = new ArrayMailer();
+        $mailer = new PersistingMailer($inner, $this->repository);
+        $id = $this->repository->record(
+            Message::to('ada@example.test')->from('a@b.test')->subject('Hi')->text('Hi'),
+            MailStatus::Pending,
+            attempts: 0,
+        );
+
+        $result = $mailer->deliverPending($id);
+
+        self::assertSame(MailStatus::Sent, $result->status);
+        self::assertSame(1, $result->attempts);
+        self::assertNull($result->error);
+        self::assertSame(1, $inner->count());
+        self::assertTrue($inner->sentTo('ada@example.test'));
+        self::assertSame(1, $this->db->query('mail_log')->count());
+    }
+
+    public function test_failed_pending_delivery_is_recorded_as_failed(): void
+    {
+        $mailer = new PersistingMailer($this->alwaysFails(), $this->repository);
+        $id = $this->repository->record(
+            Message::to('ada@example.test')->from('a@b.test')->subject('Hi')->text('Hi'),
+            MailStatus::Pending,
+            attempts: 0,
+        );
+
+        try {
+            $mailer->deliverPending($id);
+            self::fail('MailFailed should have propagated');
+        } catch (MailFailed $e) {
+            self::assertStringContainsString('refused', $e->getMessage());
+        }
+
+        $entry = $this->repository->find($id);
+        self::assertNotNull($entry);
+        self::assertSame(MailStatus::Failed, $entry->status);
+        self::assertSame(1, $entry->attempts);
+        self::assertStringContainsString('refused', (string) $entry->error);
     }
 
     /**

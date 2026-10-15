@@ -35,7 +35,12 @@ final class MailLogRepository
      *                      `mail_log` does not exist yet on a project that has
      *                      never run `orbit migrate`
      */
-    public function record(Message $message, MailStatus $status, ?string $error = null): int
+    public function record(
+        Message $message,
+        MailStatus $status,
+        ?string $error = null,
+        int $attempts = 1,
+    ): int
     {
         $now = gmdate('c');
 
@@ -52,16 +57,15 @@ final class MailLogRepository
             'headers' => json_encode($message->headers, JSON_THROW_ON_ERROR),
             'status' => $status->value,
             'error' => $error,
-            'attempts' => 1,
+            'attempts' => $attempts,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
     }
 
     /**
-     * Updates the outcome of a resend, in place — a resend is another attempt
-     * at the same logical message, not a new one, so `attempts` grows on the
-     * existing row rather than a fresh row being written each time.
+     * Updates the outcome after another delivery attempt in place — a resend
+     * or pending delivery is the same logical message, not a new row.
      */
     public function recordResend(int $id, MailStatus $status, ?string $error, int $attempts): void
     {

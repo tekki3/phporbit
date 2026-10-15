@@ -102,10 +102,12 @@ final class AdminApplication
             shared: ['sapi' => PHP_SAPI, 'phpVersion' => PHP_VERSION],
         );
 
-        // Wrapped exactly as app/bootstrap.php wraps it, so a resend triggered
-        // from a button here behaves identically to `orbit mail:resend` — the
-        // same driver, the same log, the same row updated in place.
-        $mailer = new PersistingMailer(MailerFactory::fromEnvironment($env), new MailLogRepository($database));
+        // Honor the same deferred-delivery setting as the project application.
+        $mailer = new PersistingMailer(
+            MailerFactory::fromEnvironment($env),
+            new MailLogRepository($database),
+            $env->bool('MAIL_QUEUE', false),
+        );
 
         return Application::boot(
             static function (Blueprint $app) use ($root, $storage, $database, $logger, $templates, $mailer, $env, $debug): void {

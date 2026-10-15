@@ -12,6 +12,7 @@
             <a href="/mail" @if($status === null) class="current" @endif>All</a>
             <a href="/mail?status=sent" @if($status?->value === 'sent') class="current" @endif>Sent</a>
             <a href="/mail?status=failed" @if($status?->value === 'failed') class="current" @endif>Failed</a>
+            <a href="/mail?status=pending" @if($status?->value === 'pending') class="current" @endif>Pending</a>
         </div>
 
         <form method="post" action="/mail/resend-failed">
@@ -31,8 +32,10 @@
                 <td>
                     @if($entry->status->value === 'sent')
                         <span class="chip chip-ok"><span class="chip-dot"></span>sent</span>
-                    @else
+                    @elseif($entry->status->value === 'failed')
                         <span class="chip chip-fail"><span class="chip-dot"></span>failed</span>
+                    @else
+                        <span class="chip chip-warn"><span class="chip-dot"></span>pending</span>
                     @endif
                 </td>
                 <td>{{ $entry->attempts }}</td>

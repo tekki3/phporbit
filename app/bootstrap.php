@@ -114,12 +114,13 @@ return Application::boot(
         );
         $users = new DatabaseUserProvider($database, $hasher);
 
-        // MAIL_DRIVER picks the implementation; "array" collects messages in
-        // memory rather than sending them, which is the default. Wrapped in
-        // PersistingMailer so every send — and its outcome — lands in
-        // mail_log regardless of driver, and a failed one can be resent with
-        // `orbit mail:resend`.
-        $mailer = new PersistingMailer(MailerFactory::fromEnvironment($env), new MailLogRepository($database));
+        // MAIL_QUEUE defers delivery while still recording complete messages
+        // in mail_log; orbit mail:send-pending performs the actual sends.
+        $mailer = new PersistingMailer(
+            MailerFactory::fromEnvironment($env),
+            new MailLogRepository($database),
+            $env->bool('MAIL_QUEUE', false),
+        );
 
         // Resolved on first use, not at boot: an application that never encrypts
         // anything never needs an APP_KEY.

@@ -23,12 +23,7 @@ final class SmtpMailer implements Mailer
 
     public function send(Message $message): void
     {
-        // Default sender applied before validation, so a message without an
-        // explicit from() still works when the mailer has one configured.
-        if ($message->from === null && $this->settings->from !== null) {
-            $message = $message->from($this->settings->from);
-        }
-
+        $message = $this->applyDefaultSender($message);
         $message->assertSendable();
 
         $stream = $this->connect();
@@ -63,6 +58,18 @@ final class SmtpMailer implements Mailer
                 fclose($stream);
             }
         }
+    }
+
+    /**
+     * Applies the configured sender before validation or deferred persistence.
+     */
+    public function applyDefaultSender(Message $message): Message
+    {
+        if ($message->from === null && $this->settings->from !== null) {
+            return $message->from($this->settings->from);
+        }
+
+        return $message;
     }
 
     /**

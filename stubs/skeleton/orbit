@@ -91,7 +91,8 @@ Usage:
   orbit migrate:status
   orbit migrate:rollback [--batches=1]
   orbit mail:test --to=x@example.test [--from=x@example.test]
-  orbit mail:list [--status=sent|failed] [--limit=20]
+  orbit mail:list [--status=sent|failed|pending] [--limit=20]
+  orbit mail:send-pending [--limit=50]
   orbit mail:resend <id>|--failed [--limit=50]
   orbit storage:clear
   orbit sessions:gc
@@ -486,6 +487,7 @@ try {
 
         $env = $app->container()->get(Environment::class);
         $driver = $env->string('MAIL_DRIVER', 'array');
+        $queue = $env->bool('MAIL_QUEUE', false);
         // Read directly rather than relying on the mailer's own default: only
         // SmtpMailer applies one, and this command has to work the same way
         // under every driver.
@@ -502,13 +504,20 @@ try {
             $message = Message::to($to)
                 ->from($from)
                 ->subject('phporbit test message')
-                ->text(sprintf(
-                    "Sent by `orbit mail:test` at %s, through the %s driver.\n\n"
-                    . "If this arrived, MAIL_DRIVER=%s is delivering mail correctly.",
-                    gmdate('c'),
-                    $driver,
-                    $driver,
-                ));
+                ->text($queue
+                    ? sprintf(
+                        "Queued by `orbit mail:test` at %s, through the %s driver.\n\n"
+                        . "Run `orbit mail:send-pending` to deliver this message.",
+                        gmdate('c'),
+                        $driver,
+                    )
+                    : sprintf(
+                        "Sent by `orbit mail:test` at %s, through the %s driver.\n\n"
+                        . "If this arrived, MAIL_DRIVER=%s is delivering mail correctly.",
+                        gmdate('c'),
+                        $driver,
+                        $driver,
+                    ));
         } catch (InvalidArgumentException $e) {
             fwrite(STDERR, $e->getMessage() . PHP_EOL);
             exit(1);
@@ -524,7 +533,9 @@ try {
             exit(1);
         }
 
-        if (in_array($driver, ['array', 'memory', 'null'], true)) {
+        if ($queue) {
+            printf("Queued for delivery to %s.\n", $to);
+        } elseif (in_array($driver, ['array', 'memory', 'null'], true)) {
             printf(
                 "Accepted by the \"%s\" driver — nothing left this machine. "
                 . "Set MAIL_DRIVER=smtp to test real delivery.\n",
@@ -547,7 +558,7 @@ try {
 
             if ($status === null) {
                 fwrite(STDERR, sprintf(
-                    'Unknown status "%s". Use sent or failed.',
+                    'Unknown status "%s". Use sent, failed or pending.',
                     $options['status'],
                 ) . PHP_EOL);
                 exit(1);
@@ -575,6 +586,35 @@ try {
         }
 
         exit(0);
+
+    case 'mail:send-pending':
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        $mailer = $app->container()->get(PersistingMailer::class);
+        $pending = $mailer->history(MailStatus::Pending, (int) ($options['limit'] ?? '50'));
+
+        if ($pending === []) {
+            echo 'Nothing pending to send.' . PHP_EOL;
+            exit(0);
+        }
+
+        $sent = 0;
+        $failed = 0;
+
+        foreach ($pending as $entry) {
+            try {
+                $mailer->deliverPending($entry->id);
+                printf("Sent #%d\n", $entry->id);
+                $sent++;
+            } catch (MailFailed $e) {
+                fwrite(STDERR, sprintf('Failed #%d: %s', $entry->id, $e->getMessage()) . PHP_EOL);
+                $failed++;
+            }
+        }
+
+        printf("%d sent, %d failed.\n", $sent, $failed);
+        exit($failed > 0 ? 1 : 0);
 
     case 'mail:resend':
         /** @var Application $app */

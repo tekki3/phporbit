@@ -39,6 +39,7 @@ final class WelcomeController implements Handler
 # array | smtp
 # "array" keeps messages in memory instead of sending them.
 MAIL_DRIVER=array
+MAIL_QUEUE=false
 
 MAIL_HOST=smtp.example.test
 # tls (STARTTLS, port 587) | ssl (implicit TLS, port 465) | none
@@ -55,6 +56,8 @@ MAIL_TIMEOUT=10
 <b>The default sends nothing</b>
 <p><code>array</code> collects messages in memory. A development machine that quietly starts delivering real mail to real people is a worse failure than one that sends none, so choosing <code>smtp</code> is something you write down.</p>
 </div>
+
+<p>Set <code>MAIL_QUEUE=true</code> to persist each message in <code>mail_log</code> as <code>pending</code> instead of contacting the configured driver during the request. The default is <code>false</code>, preserving direct delivery. Run <code>orbit mail:send-pending</code> from a scheduler or by hand to deliver queued messages; it updates each row to <code>sent</code> or <code>failed</code>.</p>
 
 <h2>Building a message</h2>
 
@@ -149,16 +152,20 @@ self::assertStringContainsString('Welcome', (string) $mailer->last()?->subjectLi
 
 <h2>Every send is persisted</h2>
 
-<p>Both scaffolds wrap the driver-selected mailer in <code>PersistingMailer</code>, so <code>Mailer::class</code> in the container is never the bare driver. Every <code>send()</code> writes one row to <code>mail_log</code> — the full message, and the outcome — after the attempt resolves, then behaves exactly as before: it still throws <code>MailFailed</code> on the same failures, so calling code that already catches it needs no changes.</p>
+<p>Both scaffolds wrap the driver-selected mailer in <code>PersistingMailer</code>, so <code>Mailer::class</code> in the container is never the bare driver. Normally, <code>send()</code> writes one row to <code>mail_log</code> with the full message and outcome after the attempt resolves, then still throws <code>MailFailed</code> on the same failures. With <code>MAIL_QUEUE=true</code>, it validates and stores the full message as <code>pending</code> without calling the driver.</p>
 
 [[php]]
 <?php
 // app/bootstrap.php
-$mailer = new PersistingMailer(MailerFactory::fromEnvironment($env), new MailLogRepository($database));
+$mailer = new PersistingMailer(
+    MailerFactory::fromEnvironment($env),
+    new MailLogRepository($database),
+    $env->bool('MAIL_QUEUE', false),
+);
 
 $app->container->singleton(Mailer::class, static fn (): Mailer => $mailer);
-// Bound under its concrete type too: orbit mail:resend needs resend(), which
-// the Mailer interface does not declare.
+// Bound under its concrete type too: CLI mail commands need methods the
+// Mailer interface does not declare.
 $app->container->singleton(PersistingMailer::class, static fn (): PersistingMailer => $mailer);
 [[/php]]
 
@@ -168,9 +175,9 @@ $app->container->singleton(PersistingMailer::class, static fn (): PersistingMail
 <tbody>
 <tr><td><code>to_addresses</code>, <code>cc_addresses</code>, <code>bcc_addresses</code></td><td>JSON arrays of header-value strings — the same form <code>Address::parse()</code> reads back</td></tr>
 <tr><td><code>attachments</code></td><td>JSON: filename, media type and base64-encoded contents — a resend attaches the identical bytes</td></tr>
-<tr><td><code>status</code></td><td><code>sent</code> or <code>failed</code> — there is no "pending": sending is synchronous, so the row is written after the attempt resolves</td></tr>
+<tr><td><code>status</code></td><td><code>pending</code> (deferred, not attempted), <code>sent</code>, or <code>failed</code></td></tr>
 <tr><td><code>error</code></td><td>The server's reply, on failure — the same string a caller would see in <code>MailFailed::getMessage()</code></td></tr>
-<tr><td><code>attempts</code></td><td>Starts at 1; a resend increments it in place rather than inserting a new row</td></tr>
+<tr><td><code>attempts</code></td><td>Pending messages start at 0; each actual delivery attempt increments it, including a resend</td></tr>
 </tbody>
 </table>
 </div>
@@ -179,11 +186,18 @@ $app->container->singleton(PersistingMailer::class, static fn (): PersistingMail
 
 <h3>Resending</h3>
 
-<p><code>orbit mail:list</code> and <code>orbit mail:resend</code> — see <a href="cli.html">The orbit CLI</a> for every flag.</p>
+<p><code>orbit mail:list</code>, <code>orbit mail:send-pending</code> and <code>orbit mail:resend</code> — see <a href="cli.html">The orbit CLI</a> for every flag.</p>
 
 [[bash]]
 $ ./orbit mail:list --status=failed
 4     failed  1    bob@example.test                   Reminder                                 2026-01-01T09:14:02+00:00
+
+$ ./orbit mail:list --status=pending
+5     pending 0    ada@example.test                   Welcome                                  2026-01-01T09:15:02+00:00
+
+$ ./orbit mail:send-pending
+Sent #5
+1 sent, 0 failed.
 
 $ ./orbit mail:resend 4
 Resent #4 to bob@example.test.
@@ -194,10 +208,7 @@ $ ./orbit mail:resend --failed
 
 <p>Resending is refused for anything that is not currently <code>failed</code> — resending a message already marked <code>sent</code> would deliver it twice with no record that it happened, which defeats the reason the row exists. A resend that fails again updates the same row: the status and error move to the latest attempt, and <code>attempts</code> grows.</p>
 
-<div class="warn">
-<b>Still not a queue</b>
-<p>Every resend is still a synchronous <code>send()</code> — a slow server slows the <code>orbit mail:resend</code> process the same way it would slow a request. What changed is that a failure is no longer lost: it is a row you can look at and a command you can run, not a retry loop the framework runs on its own.</p>
-</div>
+<p><code>mail:send-pending</code> delivers each selected message synchronously in the CLI process. A slow server slows that command; schedule it externally if desired. It continues after a message fails, records the error on that row, and exits non-zero if any send failed. This is deferred storage and manual delivery, not a background worker or automatic retry loop.</p>
 
 <h2>Not built</h2>
 

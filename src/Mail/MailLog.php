@@ -63,8 +63,7 @@ final class MailLog
             self::decodeAttachments($row['attachments'] ?? null),
             self::decodeHeaders($row['headers'] ?? null),
             // A status the enum does not recognise is a schema mismatch, not a
-            // recoverable state — Failed is the safer of the two to assume,
-            // since it is the one that under-counts nothing as delivered.
+            // recoverable state — Failed is safer than assuming it was delivered.
             MailStatus::tryFrom((string) ($row['status'] ?? '')) ?? MailStatus::Failed,
             self::decodeNullableString($row['error'] ?? null),
             (int) ($row['attempts'] ?? 1),
