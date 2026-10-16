@@ -29,6 +29,11 @@
         <p class="summary">A safe PHP framework that runs on itself. One application, unchanged, on its own server, FrankenPHP, nginx+FPM or Apache.</p>
         <p>phporbit is a small PHP framework built around one constraint: <strong>the same application runs unchanged on four deployment targets</strong>, and it never has to know which one it is on.</p>
 
+<div class="good">
+<b>New to phporbit? Start here.</b>
+<p>A framework connects URLs to your PHP code and gives you tools for pages, forms and databases. Follow <a href="getting-started.html">Getting started</a> to install phporbit, run a blank application and build a page that greets a visitor by name. It explains the terms, includes Windows instructions and shows what you should see after each step. Basic PHP and HTML are enough to begin; the architecture chapters can wait.</p>
+</div>
+
 <div class="scroller">
 <table>
 <thead><tr><th>Target</th><th>Process model</th><th>Used for</th></tr></thead>
@@ -43,12 +48,15 @@
 
 <p>&ldquo;Runs on itself&rdquo; is literal. <code>./orbit serve</code> is a real HTTP/1.1 server built on sockets, sharing the exact request pipeline used in production — not a router script in front of <code>php -S</code>.</p>
 
-<h2>A complete application</h2>
+<h2>How a page fits together</h2>
 
-<p>This is a working app. Two files, no configuration.</p>
+<p>In a generated project, these three files illustrate a complete page. A <strong>route</strong> selects a <strong>controller</strong>, and the controller renders a <strong>template</strong>. For step-by-step instructions that preserve your starter routes, follow the <a href="getting-started.html#first-controller">first-page tutorial</a>.</p>
 
 <figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">declare</span><span class="tk-p">(</span>strict_types<span class="tk-p">=</span><span class="tk-num">1</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
 <span class="tk-comment">// app/routes.php</span>
+<span class="tk-keyword">use</span> <span class="tk-class">App\Controllers\HelloController</span><span class="tk-p">;</span>
 <span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Response</span><span class="tk-p">;</span>
 <span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Routing\RouteCollection</span><span class="tk-p">;</span>
 
@@ -59,7 +67,16 @@
 <span class="tk-p">}</span><span class="tk-p">;</span></code></pre></figure>
 
 <figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">declare</span><span class="tk-p">(</span>strict_types<span class="tk-p">=</span><span class="tk-num">1</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
 <span class="tk-comment">// app/src/Controllers/HelloController.php</span>
+<span class="tk-keyword">namespace</span> <span class="tk-class">App\Controllers</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Response</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\ServerRequest</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Routing\Handler</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\View\TemplateEngine</span><span class="tk-p">;</span>
+
 <span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">HelloController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
 <span class="tk-p">{</span>
     <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span><span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">TemplateEngine</span> <span class="tk-var">$view</span><span class="tk-p">)</span>
@@ -69,12 +86,26 @@
     <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
     <span class="tk-p">{</span>
         <span class="tk-comment">// {{ }} escapes. The payload arrives as text, not markup.</span>
-        <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;hello&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;name&#039;</span> =&gt; <span class="tk-var">$request</span>-&gt;<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-string">&#039;name&#039;</span><span class="tk-p">)</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+        <span class="tk-keyword">return</span> <span class="tk-var">$this</span>-&gt;view-&gt;<span class="tk-fn">respond</span><span class="tk-p">(</span><span class="tk-string">&#039;hello&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span>
+            <span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-string">&#039;Hello&#039;</span><span class="tk-p">,</span>
+            <span class="tk-string">&#039;name&#039;</span> =&gt; <span class="tk-var">$request</span>-&gt;<span class="tk-fn">attribute</span><span class="tk-p">(</span><span class="tk-string">&#039;name&#039;</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
     <span class="tk-p">}</span>
 <span class="tk-p">}</span></code></pre></figure>
 
-<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit serve
-phporbit listening on http://127.0.0.1:8080 (production mode) — Ctrl-C to stop</code></pre></figure>
+<p>Save the template as <code>app/templates/hello.orbit.php</code>. It uses the generated project's existing layout:</p>
+
+<figure class="code"><figcaption>Template</figcaption><pre><code>@extends(&#039;layout&#039;)
+
+@section(&#039;content&#039;)
+&lt;h1&gt;Hello, {{ $name }}!&lt;/h1&gt;
+@endsection</code></pre></figure>
+
+<p><code>{{ $name }}</code> prints the value supplied by the controller with HTML escaping. The <code>title</code> value supplies the browser tab's title in the layout.</p>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code>php orbit serve --debug</code></pre></figure>
+
+<p>Open <code>http://127.0.0.1:8080/hello/Ada</code> to see <strong>Hello, Ada!</strong>. If the server is already running, stop it with Ctrl+C before starting it again to pick up PHP changes. Template-only edits appear on refresh in debug mode.</p>
 
 <h2>What it gives you</h2>
 
@@ -109,14 +140,14 @@ phporbit listening on http://127.0.0.1:8080 (production mode) — Ctrl-C to stop
 <ul>
 <li>Templates escape with <code>{{ }}</code>. Raw output needs the deliberately loud <code>{!! !!}</code>.</li>
 <li>CSRF protection is on. A route opts out with <code>csrfExempt: true</code>.</li>
-<li>The database has no method that takes an interpolated query.</li>
+<li>The query builder binds values as parameters. When writing SQL yourself, use placeholders rather than interpolating user input.</li>
 <li>An <code>UPDATE</code> or <code>DELETE</code> with no <code>where()</code> throws unless you call <code>affectingEveryRow()</code>.</li>
 <li>Uploads are judged by their bytes, never by their filename or declared type.</li>
 </ul>
 
 <div class="note">
 <b>Where to go next</b>
-<p><a href="getting-started.html">Getting started</a> has you serving pages in about a minute. <a href="architecture.html">Architecture</a> explains the process-model split that everything else follows from — it is the shortest path to understanding why the rest of the framework looks the way it does.</p>
+<p>Start with <a href="getting-started.html">Getting started</a>, then explore <a href="routing.html">routing</a>, <a href="templates.html">templates</a> and <a href="forms.html">forms</a>. When you are ready to understand service lifetimes and worker safety, read <a href="architecture.html">Architecture</a>.</p>
 </div>
     </article>
     <nav class="pager"><span></span><a class="next" href="getting-started.html"><span>Next</span>Getting started</a></nav>
