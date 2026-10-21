@@ -42,6 +42,10 @@ Run `php orbit migrate` before `php orbit db:seed`. Seeders are PHP files in
 `database/seeders/`, each returning a `PhpOrbit\Database\Seeder` instance with
 `run(PhpOrbit\Database\Connection $database): void`.
 
+Create a starter with `php orbit make:seed 0002_categories`. Names use lowercase
+letters, digits and underscores and become filenames exactly; a numeric prefix
+controls the run order. Existing files require `--force` to overwrite.
+
 Files run in filename order on every invocation, so check for existing data
 before inserting it. Each seeder runs in its own transaction: a failure rolls
 back that seeder and stops the run, but earlier seeders stay committed.

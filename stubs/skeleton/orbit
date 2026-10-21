@@ -22,6 +22,7 @@ use PhpOrbit\Console\Lifetime;
 use PhpOrbit\Console\MiddlewareMaker;
 use PhpOrbit\Console\MigrationMaker;
 use PhpOrbit\Console\ModelMaker;
+use PhpOrbit\Console\SeedMaker;
 use PhpOrbit\Crypto\Key;
 use PhpOrbit\Database\Connection;
 use PhpOrbit\Database\ConnectionFailed;
@@ -86,6 +87,7 @@ Usage:
                          [--no-honeypot] [--controllers] [--force]
   orbit make:middleware <Name> [--force]
   orbit make:migration <name> [--table=x] [--sequential] [--force]
+  orbit make:seed <name> [--force]
   orbit make:model <Name> [--table=x] [--fields=a:string,b:int] [--force]
   orbit serve [--host=127.0.0.1] [--port=8080] [--debug]
   orbit ui [--host=127.0.0.1] [--port=8081] [--debug]
@@ -325,6 +327,31 @@ try {
         }
 
         echo PHP_EOL . 'Edit it, then run: orbit migrate' . PHP_EOL;
+        exit(0);
+
+    case 'make:seed':
+        $name = null;
+        foreach (array_slice($arguments, 1) as $argument) {
+            if (is_string($argument) && !str_starts_with($argument, '--')) {
+                $name = $argument;
+                break;
+            }
+        }
+
+        if ($name === null) {
+            fwrite(STDERR, 'Which seed? Try: orbit make:seed 0002_categories' . PHP_EOL);
+            exit(1);
+        }
+
+        try {
+            $path = (new SeedMaker($root))->create($name, force: isset($options['force']));
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        echo 'Created ' . $path . PHP_EOL;
+        echo PHP_EOL . 'Edit it, then run: orbit db:seed' . PHP_EOL;
         exit(0);
 
     case 'make:model':

@@ -351,6 +351,26 @@ final class ScaffoldTest extends TestCase
                 unset($database);
             }
 
+            self::assertStringContainsString('orbit make:seed', $this->runCli($target, 'help'));
+            self::assertStringContainsString('Which seed?', $this->runCli($target, 'make:seed', 1));
+            self::assertStringContainsString(
+                'Created database/seeders/0002_categories.php',
+                $this->runCli($target, 'make:seed', arguments: ['0002_categories']),
+            );
+            self::assertStringContainsString(
+                '--force',
+                $this->runCli($target, 'make:seed', 1, ['0002_categories']),
+            );
+            self::assertStringContainsString(
+                'Created database/seeders/0002_categories.php',
+                $this->runCli($target, 'make:seed', arguments: ['0002_categories', '--force']),
+            );
+            self::assertStringContainsString(
+                'Invalid seed name',
+                $this->runCli($target, 'make:seed', 1, ['../escape']),
+            );
+            self::assertStringContainsString('Seeded 0002_categories', $this->runCli($target, 'db:seed'));
+
             file_put_contents($target . '/database/seeders/9999_invalid.php', '<?php return null;');
             self::assertStringContainsString('Seeding error:', $this->runCli($target, 'db:seed', 1));
         } finally {
@@ -369,15 +389,17 @@ final class ScaffoldTest extends TestCase
         }
     }
 
-    private function runCli(string $target, string $command, int $expectedStatus = 0): string
+    /** @param list<string> $arguments */
+    private function runCli(string $target, string $command, int $expectedStatus = 0, array $arguments = []): string
     {
         $output = [];
         $status = 0;
         exec(sprintf(
-            '%s %s %s 2>&1',
+            '%s %s %s %s 2>&1',
             escapeshellarg(PHP_BINARY),
             escapeshellarg($target . '/orbit'),
             escapeshellarg($command),
+            implode(' ', array_map(escapeshellarg(...), $arguments)),
         ), $output, $status);
 
         $text = implode("\n", $output);

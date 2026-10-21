@@ -20,6 +20,7 @@ Usage:
                          [--no-honeypot] [--controllers] [--force]
   orbit make:middleware <Name> [--force]
   orbit make:migration <name> [--table=x] [--sequential] [--force]
+  orbit make:seed <name> [--force]
   orbit make:model <Name> [--table=x] [--fields=a:string,b:int] [--force]
   orbit serve [--host=127.0.0.1] [--port=8080] [--debug]
   orbit ui [--host=127.0.0.1] [--port=8081] [--debug]
@@ -600,6 +601,19 @@ $ ./orbit migrate:rollback --batches=2
 [[/bash]]
 
 <p>Reverses the most recent batch — one deployment's worth of changes. Every migration in the batch is loaded and checked before anything is undone, so a batch containing an irreversible migration fails without half-rolling-back the rest.</p>
+
+<h2>make:seed</h2>
+
+[[bash]]
+$ ./orbit make:seed 0002_categories
+Created database/seeders/0002_categories.php
+
+Edit it, then run: orbit db:seed
+[[/bash]]
+
+<p>Creates a PHP file returning a <code>Seeder</code> with an empty <code>run(Connection $database): void</code> method. Edit it to add idempotent data writes. The generator does not boot the application, connect to the database or run any seeders.</p>
+
+<p>Names use lowercase letters, digits and underscores, starting with a letter or digit. The name becomes the filename exactly; no timestamp or number is added automatically. Use a prefix such as <code>0002_</code> when order matters, because <code>db:seed</code> runs files in filename order. Paths and file extensions are refused. Existing files are never overwritten unless <code>--force</code> is passed.</p>
 
 <h2>db:seed</h2>
 

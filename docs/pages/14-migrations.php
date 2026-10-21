@@ -180,6 +180,8 @@ $migrator->rollback(1);   // returns what it reversed
 
 <p>Seed data is not a migration. Put PHP files in <code>database/seeders/</code>, each returning a <code>PhpOrbit\Database\Seeder</code>. Run migrations first, then seed explicitly:</p>
 
+<p>Generate a starter with <code>./orbit make:seed 0002_categories</code>, then edit its <code>run()</code> method. Names become filenames exactly; use a numeric prefix to choose the order. Existing files are refused unless <code>--force</code> is passed.</p>
+
 [[bash]]
 $ ./orbit db:seed
 Seeded 0001_demo_account
