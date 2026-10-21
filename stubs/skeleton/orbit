@@ -23,8 +23,11 @@ use PhpOrbit\Console\MiddlewareMaker;
 use PhpOrbit\Console\MigrationMaker;
 use PhpOrbit\Console\ModelMaker;
 use PhpOrbit\Crypto\Key;
+use PhpOrbit\Database\Connection;
 use PhpOrbit\Database\ConnectionFailed;
 use PhpOrbit\Database\Migrator;
+use PhpOrbit\Database\SeedFailed;
+use PhpOrbit\Database\SeedRunner;
 use PhpOrbit\Kernel\Application;
 use PhpOrbit\Mail\MailFailed;
 use PhpOrbit\Mail\MailStatus;
@@ -90,6 +93,7 @@ Usage:
   orbit migrate
   orbit migrate:status
   orbit migrate:rollback [--batches=1]
+  orbit db:seed
   orbit mail:test --to=x@example.test [--from=x@example.test]
   orbit mail:list [--status=sent|failed|pending] [--limit=20]
   orbit mail:send-pending [--limit=50]
@@ -474,6 +478,25 @@ try {
 
         exit(0);
 
+    case 'db:seed':
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        $seeded = (new SeedRunner(
+            $app->container()->get(Connection::class),
+            $root . '/database/seeders',
+        ))->run();
+
+        foreach ($seeded as $name) {
+            echo 'Seeded ' . $name . PHP_EOL;
+        }
+
+        if ($seeded === []) {
+            echo 'Nothing to seed.' . PHP_EOL;
+        }
+
+        exit(0);
+
     case 'mail:test':
         /** @var Application $app */
         $app = require $bootstrap;
@@ -729,6 +752,9 @@ try {
     }
 } catch (InvalidEnvFile | MissingConfiguration | ConnectionFailed $e) {
     fwrite(STDERR, 'Configuration error: ' . $e->getMessage() . PHP_EOL);
+    exit(1);
+} catch (SeedFailed $e) {
+    fwrite(STDERR, 'Seeding error: ' . $e->getMessage() . PHP_EOL);
     exit(1);
 } catch (InvalidRoutePattern $e) {
     fwrite(STDERR, 'Routing error: ' . $e->getMessage() . PHP_EOL);

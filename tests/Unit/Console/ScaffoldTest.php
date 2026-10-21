@@ -6,6 +6,7 @@ namespace PhpOrbit\Tests\Unit\Console;
 
 use PhpOrbit\Console\Scaffold;
 use PhpOrbit\Console\Variant;
+use PhpOrbit\Database\Connection;
 use PhpOrbit\Database\Model;
 use PhpOrbit\Http\Headers;
 use PhpOrbit\Http\Method;
@@ -64,7 +65,7 @@ final class ScaffoldTest extends TestCase
             self::assertFileExists($target . '/' . $file, $variant->value);
         }
 
-        foreach (['storage/sessions', 'storage/cache/views', 'database/migrations'] as $directory) {
+        foreach (['storage/sessions', 'storage/cache/views', 'database/migrations', 'database/seeders'] as $directory) {
             self::assertDirectoryExists($target . '/' . $directory, $variant->value);
         }
     }
@@ -302,6 +303,87 @@ final class ScaffoldTest extends TestCase
 
             $previousLevel === false ? putenv('LOG_LEVEL') : putenv('LOG_LEVEL=' . $previousLevel);
         }
+    }
+
+    #[DataProvider('seedProjects')]
+    public function test_db_seed_works_through_both_cli_entrypoints(Variant $variant, bool $checkoutCli): void
+    {
+        $target = $this->workspace . '/my-app';
+        $this->scaffold()->create($target, $variant);
+
+        if ($checkoutCli) {
+            copy(dirname(__DIR__, 3) . '/orbit', $target . '/orbit');
+        }
+
+        mkdir($target . '/vendor');
+        file_put_contents($target . '/vendor/autoload.php', sprintf(
+            '<?php $loader = require %s; $loader->addPsr4("App\\\\", %s, true); return $loader;',
+            var_export(dirname(__DIR__, 3) . '/vendor/autoload.php', true),
+            var_export($target . '/app/src', true),
+        ));
+
+        $settings = [
+            'DB_DRIVER' => 'sqlite',
+            'DB_DATABASE' => 'storage/test.sqlite',
+            'LOG_LEVEL' => 'error',
+        ];
+        $previous = [];
+        foreach ($settings as $key => $value) {
+            $previous[$key] = getenv($key);
+            putenv($key . '=' . $value);
+        }
+
+        try {
+            $this->runCli($target, 'migrate');
+
+            $expected = $variant === Variant::Demo ? 'Seeded 0001_demo_account' : 'Nothing to seed.';
+            self::assertStringContainsString($expected, $this->runCli($target, 'db:seed'));
+            self::assertStringContainsString($expected, $this->runCli($target, 'db:seed'));
+            self::assertStringContainsString('orbit db:seed', $this->runCli($target, 'help'));
+
+            if ($variant === Variant::Demo) {
+                $database = Connection::sqlite($target . '/storage/test.sqlite');
+                $users = $database->query('users')->get();
+                self::assertCount(1, $users);
+                self::assertSame('demo@example.test', $users[0]['email']);
+                self::assertIsString($users[0]['password_hash']);
+                self::assertTrue(password_verify('correct-horse-battery', $users[0]['password_hash']));
+                unset($database);
+            }
+
+            file_put_contents($target . '/database/seeders/9999_invalid.php', '<?php return null;');
+            self::assertStringContainsString('Seeding error:', $this->runCli($target, 'db:seed', 1));
+        } finally {
+            foreach ($previous as $key => $value) {
+                $value === false ? putenv($key) : putenv($key . '=' . $value);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{Variant, bool}> */
+    public static function seedProjects(): iterable
+    {
+        foreach (self::variants() as $name => [$variant]) {
+            yield $name . ' scaffold CLI' => [$variant, false];
+            yield $name . ' checkout CLI' => [$variant, true];
+        }
+    }
+
+    private function runCli(string $target, string $command, int $expectedStatus = 0): string
+    {
+        $output = [];
+        $status = 0;
+        exec(sprintf(
+            '%s %s %s 2>&1',
+            escapeshellarg(PHP_BINARY),
+            escapeshellarg($target . '/orbit'),
+            escapeshellarg($command),
+        ), $output, $status);
+
+        $text = implode("\n", $output);
+        self::assertSame($expectedStatus, $status, $text);
+
+        return $text;
     }
 
     // --- helpers --------------------------------------------------------------

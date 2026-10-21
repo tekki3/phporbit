@@ -36,6 +36,19 @@ For a project generated with `--demo`, run `php orbit db:seed` before starting
 the server to create the local demo login:
 `demo@example.test` / `correct-horse-battery`.
 
+## Seed data
+
+Run `php orbit migrate` before `php orbit db:seed`. Seeders are PHP files in
+`database/seeders/`, each returning a `PhpOrbit\Database\Seeder` instance with
+`run(PhpOrbit\Database\Connection $database): void`.
+
+Files run in filename order on every invocation, so check for existing data
+before inserting it. Each seeder runs in its own transaction: a failure rolls
+back that seeder and stops the run, but earlier seeders stay committed.
+Keep file-level code free of side effects and use seeders for data, not schema
+changes. There is no seeding ledger or automatic run when the application boots.
+An empty or absent seed directory prints `Nothing to seed.`.
+
 ## Your first page
 
 A **route** maps a URL to a **controller** (the PHP class handling the request).

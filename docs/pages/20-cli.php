@@ -605,10 +605,12 @@ $ ./orbit migrate:rollback --batches=2
 
 [[bash]]
 $ ./orbit db:seed
-Seeded demo account: demo@example.test / correct-horse-battery
+Seeded 0001_demo_account
 [[/bash]]
 
-<p>Idempotent — safe to re-run. Seed data is not a migration, because it is not a schema change and should not be part of a rollback.</p>
+<p>Runs PHP files from <code>database/seeders/</code> in filename order. Each file returns a <code>PhpOrbit\Database\Seeder</code> with <code>run(Connection $database): void</code>. Available in both blank and demo projects; an empty or absent directory prints <code>Nothing to seed.</code>.</p>
+
+<p>Every invocation runs all seeders again, so make their writes idempotent. Each seeder gets its own transaction; a failure rolls back that seeder, stops later seeders and exits nonzero, leaving earlier successful seeders committed. Run <code>migrate</code> first. There is no seeding ledger, automatic run at boot or seed rollback command. See <a href="migrations.html">Migrations and seeding</a> for a complete example. The demo seeder creates the local demo login only if it is absent.</p>
 
 <h2>mail:test</h2>
 

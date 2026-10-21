@@ -11,7 +11,6 @@ declare(strict_types=1);
  * that worker-safety problems surface locally.
  */
 
-use App\Auth\DatabaseUserProvider;
 use PhpOrbit\Admin\AdminApplication;
 use PhpOrbit\Config\Environment;
 use PhpOrbit\Config\InvalidEnvFile;
@@ -26,8 +25,11 @@ use PhpOrbit\Console\ModelMaker;
 use PhpOrbit\Console\Scaffold;
 use PhpOrbit\Console\Variant;
 use PhpOrbit\Crypto\Key;
+use PhpOrbit\Database\Connection;
 use PhpOrbit\Database\ConnectionFailed;
 use PhpOrbit\Database\Migrator;
+use PhpOrbit\Database\SeedFailed;
+use PhpOrbit\Database\SeedRunner;
 use PhpOrbit\Kernel\Application;
 use PhpOrbit\Mail\MailFailed;
 use PhpOrbit\Mail\MailStatus;
@@ -550,16 +552,19 @@ try {
         /** @var Application $app */
         $app = require $bootstrap;
 
-        $provider = $app->container()->get(DatabaseUserProvider::class);
+        $seeded = (new SeedRunner(
+            $app->container()->get(Connection::class),
+            $root . '/database/seeders',
+        ))->run();
 
-        if ($provider->findByEmail('demo@example.test') !== null) {
-            echo 'The demo account already exists.' . PHP_EOL;
-            exit(0);
+        foreach ($seeded as $name) {
+            echo 'Seeded ' . $name . PHP_EOL;
         }
 
-        $provider->create('demo@example.test', 'correct-horse-battery', 'Demo User');
+        if ($seeded === []) {
+            echo 'Nothing to seed.' . PHP_EOL;
+        }
 
-        echo 'Created demo@example.test / correct-horse-battery' . PHP_EOL;
         exit(0);
 
     case 'mail:test':
@@ -819,6 +824,9 @@ try {
     // A configuration mistake is the user's to fix, not a crash to debug: show
     // the message plainly rather than a stack trace through the container.
     fwrite(STDERR, 'Configuration error: ' . $e->getMessage() . PHP_EOL);
+    exit(1);
+} catch (SeedFailed $e) {
+    fwrite(STDERR, 'Seeding error: ' . $e->getMessage() . PHP_EOL);
     exit(1);
 } catch (InvalidRoutePattern $e) {
     // Same reasoning as the configuration errors above: a route that fails to

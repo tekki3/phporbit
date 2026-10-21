@@ -178,11 +178,38 @@ $migrator->rollback(1);   // returns what it reversed
 
 <h2>Seeding</h2>
 
-<p>Seed data is not a migration. It belongs in <code>./orbit db:seed</code>, which is idempotent and safe to re-run:</p>
+<p>Seed data is not a migration. Put PHP files in <code>database/seeders/</code>, each returning a <code>PhpOrbit\Database\Seeder</code>. Run migrations first, then seed explicitly:</p>
 
 [[bash]]
 $ ./orbit db:seed
-Seeded demo account: demo@example.test / correct-horse-battery
+Seeded 0001_demo_account
 [[/bash]]
+
+<p>Files run in filename order on <em>every invocation</em>, with no ledger or automatic rollback command. Each seeder runs in its own transaction. If it fails, its data writes roll back and later seeders do not run; earlier successful seeders remain committed. All files are loaded and checked before the first seeder runs. Keep file-level code free of side effects and put writes inside <code>run()</code>. Use seeders for data, not DDL: MySQL schema changes can commit implicitly.</p>
+
+<p>For example, <code>database/seeders/0001_starter_note.php</code>:</p>
+
+[[php]]
+<?php
+declare(strict_types=1);
+
+use PhpOrbit\Database\Connection;
+use PhpOrbit\Database\Seeder;
+
+return new class implements Seeder {
+    public function run(Connection $database): void
+    {
+        if ($database->query('notes')->where('title', '=', 'Welcome')->first() === null) {
+            $database->query('notes')->insert([
+                'title' => 'Welcome',
+                'body' => 'Your first note.',
+                'created_at' => gmdate('c'),
+            ]);
+        }
+    }
+};
+[[/php]]
+
+<p>Make each seeder idempotent by checking for existing data rather than inserting duplicates or overwriting user changes. The demo seeder creates <code>demo@example.test</code> / <code>correct-horse-battery</code> only if that account is absent. These are local demo credentials, not production credentials. Blank projects have an empty seed directory; an empty or absent directory prints <code>Nothing to seed.</code>. Seeders never run automatically during boot or <code>serve</code>.</p>
 HTML,
 ];
