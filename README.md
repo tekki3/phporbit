@@ -72,6 +72,8 @@ After creating the project, use its local `php orbit` script, not the global
 same installation commands inside `my-demo`, adding `php orbit db:seed` after
 `migrate`. The demo includes sign-in, notes, uploads and a self-check page.
 Its local demo login is `demo@example.test` / `correct-horse-battery`.
+To run one seeder instead of all of them, pass its filename without `.php`,
+for example `php orbit db:seed 0001_demo_account`.
 
 ## Build your first page
 

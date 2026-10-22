@@ -47,7 +47,7 @@ Usage:
   orbit migrate
   orbit migrate:status
   orbit migrate:rollback [--batches=1]
-  orbit db:seed
+  orbit db:seed [name]
   orbit mail:test --to=x@example.test [--from=x@example.test]
   orbit mail:list [--status=sent|failed|pending] [--limit=20]
   orbit mail:send-pending [--limit=50]
@@ -580,7 +580,12 @@ Seeded 0001_demo_account</code></pre></figure>
 
 <p>Runs PHP files from <code>database/seeders/</code> in filename order. Each file returns a <code>PhpOrbit\Database\Seeder</code> with <code>run(Connection $database): void</code>. Available in both blank and demo projects; an empty or absent directory prints <code>Nothing to seed.</code>.</p>
 
-<p>Every invocation runs all seeders again, so make their writes idempotent. Each seeder gets its own transaction; a failure rolls back that seeder, stops later seeders and exits nonzero, leaving earlier successful seeders committed. Run <code>migrate</code> first. There is no seeding ledger, automatic run at boot or seed rollback command. See <a href="migrations.html">Migrations and seeding</a> for a complete example. The demo seeder creates the local demo login only if it is absent.</p>
+<p>By default every invocation runs all seeders again, so make their writes idempotent. Pass a seeder's exact filename without <code>.php</code> to run only that seeder:</p>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit db:seed 0002_categories
+Seeded 0002_categories</code></pre></figure>
+
+<p>A requested name that does not exist is an error. Each selected seeder gets its own transaction; a failure rolls back that seeder and exits nonzero. In an all-seeders run, later seeders stop and earlier successful seeders stay committed. Run <code>migrate</code> first. There is no seeding ledger, automatic run at boot or seed rollback command. See <a href="migrations.html">Migrations and seeding</a> for a complete example. The demo seeder creates the local demo login only if it is absent.</p>
 
 <h2>mail:test</h2>
 

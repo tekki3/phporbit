@@ -22,9 +22,13 @@ final readonly class SeedRunner
      * @return list<string> the seeders run, in order
      * @phpstan-impure
      */
-    public function run(): array
+    public function run(?string $name = null): array
     {
         if (!file_exists($this->directory)) {
+            if ($name !== null) {
+                throw new SeedFailed(sprintf('Seeder "%s" was not found in "%s".', $name, $this->directory));
+            }
+
             return [];
         }
 
@@ -39,6 +43,17 @@ final readonly class SeedRunner
         }
 
         sort($paths, SORT_STRING);
+
+        if ($name !== null) {
+            $paths = array_values(array_filter(
+                $paths,
+                static fn (string $path): bool => basename($path, '.php') === $name,
+            ));
+
+            if ($paths === []) {
+                throw new SeedFailed(sprintf('Seeder "%s" was not found in "%s".', $name, $this->directory));
+            }
+        }
 
         $seeders = [];
         foreach ($paths as $path) {

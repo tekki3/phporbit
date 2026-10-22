@@ -43,6 +43,26 @@ final class SeedRunnerTest extends TestCase
         self::assertFalse($this->database->inTransaction());
     }
 
+    public function test_it_runs_only_the_named_seeder(): void
+    {
+        $this->write('0001_first', '$database->query("items")->insert(["name" => "first"]);');
+        $this->write('0002_second', '$database->query("items")->insert(["name" => "second"]);');
+        file_put_contents($this->directory . '/0003_invalid.php', '<?php return null;');
+
+        self::assertSame(['0002_second'], $this->runner()->run('0002_second'));
+        self::assertSame([['name' => 'second']], $this->database->query('items')->get());
+    }
+
+    public function test_a_requested_seeder_must_exist(): void
+    {
+        $this->write('0001_first', '$database->query("items")->insert(["name" => "first"]);');
+
+        $this->expectException(SeedFailed::class);
+        $this->expectExceptionMessage('Seeder "0002_missing" was not found');
+
+        $this->runner()->run('0002_missing');
+    }
+
     public function test_every_run_loads_fresh_seeders_and_repeats_them(): void
     {
         $this->write('0001_items', <<<'PHP'

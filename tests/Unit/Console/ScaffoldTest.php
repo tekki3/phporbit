@@ -372,7 +372,15 @@ final class ScaffoldTest extends TestCase
             self::assertStringContainsString('Seeded 0002_categories', $this->runCli($target, 'db:seed'));
 
             file_put_contents($target . '/database/seeders/9999_invalid.php', '<?php return null;');
+            self::assertStringContainsString(
+                'Seeded 0002_categories',
+                $this->runCli($target, 'db:seed', arguments: ['0002_categories']),
+            );
             self::assertStringContainsString('Seeding error:', $this->runCli($target, 'db:seed', 1));
+            self::assertStringContainsString(
+                'was not found',
+                $this->runCli($target, 'db:seed', 1, ['0003_missing']),
+            );
         } finally {
             foreach ($previous as $key => $value) {
                 $value === false ? putenv($key) : putenv($key . '=' . $value);

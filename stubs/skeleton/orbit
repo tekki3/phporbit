@@ -95,7 +95,7 @@ Usage:
   orbit migrate
   orbit migrate:status
   orbit migrate:rollback [--batches=1]
-  orbit db:seed
+  orbit db:seed [name]
   orbit mail:test --to=x@example.test [--from=x@example.test]
   orbit mail:list [--status=sent|failed|pending] [--limit=20]
   orbit mail:send-pending [--limit=50]
@@ -509,10 +509,18 @@ try {
         /** @var Application $app */
         $app = require $bootstrap;
 
+        $name = null;
+        foreach (array_slice($arguments, 1) as $argument) {
+            if (is_string($argument) && !str_starts_with($argument, '--')) {
+                $name = $argument;
+                break;
+            }
+        }
+
         $seeded = (new SeedRunner(
             $app->container()->get(Connection::class),
             $root . '/database/seeders',
-        ))->run();
+        ))->run($name);
 
         foreach ($seeded as $name) {
             echo 'Seeded ' . $name . PHP_EOL;

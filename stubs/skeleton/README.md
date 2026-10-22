@@ -46,9 +46,11 @@ Create a starter with `php orbit make:seed 0002_categories`. Names use lowercase
 letters, digits and underscores and become filenames exactly; a numeric prefix
 controls the run order. Existing files require `--force` to overwrite.
 
-Files run in filename order on every invocation, so check for existing data
-before inserting it. Each seeder runs in its own transaction: a failure rolls
-back that seeder and stops the run, but earlier seeders stay committed.
+Run every seeder in filename order with `php orbit db:seed`, or select one by
+its filename without `.php`, such as `php orbit db:seed 0002_categories`.
+Seeders run every time, so check for existing data before inserting it. Each
+seeder runs in its own transaction: a failure rolls back that seeder and stops
+the run, but earlier seeders stay committed.
 Keep file-level code free of side effects and use seeders for data, not schema
 changes. There is no seeding ledger or automatic run when the application boots.
 An empty or absent seed directory prints `Nothing to seed.`.
