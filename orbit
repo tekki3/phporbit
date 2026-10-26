@@ -11,6 +11,7 @@ declare(strict_types=1);
  * that worker-safety problems surface locally.
  */
 
+use App\Support\SelectedSeedRunner;
 use PhpOrbit\Admin\AdminApplication;
 use PhpOrbit\Config\Environment;
 use PhpOrbit\Config\InvalidEnvFile;
@@ -30,7 +31,6 @@ use PhpOrbit\Database\Connection;
 use PhpOrbit\Database\ConnectionFailed;
 use PhpOrbit\Database\Migrator;
 use PhpOrbit\Database\SeedFailed;
-use PhpOrbit\Database\SeedRunner;
 use PhpOrbit\Kernel\Application;
 use PhpOrbit\Mail\MailFailed;
 use PhpOrbit\Mail\MailStatus;
@@ -107,7 +107,7 @@ Usage:
   orbit migrate
   orbit migrate:status
   orbit migrate:rollback [--batches=1]
-  orbit db:seed [name]
+  orbit db:seed [name] [--seed=name]
   orbit mail:test --to=x@example.test [--from=x@example.test]
   orbit mail:list [--status=sent|failed|pending] [--limit=20]
   orbit mail:send-pending [--limit=50]
@@ -576,18 +576,37 @@ try {
         exit(0);
 
     case 'db:seed':
-        /** @var Application $app */
-        $app = require $bootstrap;
-
-        $name = null;
-        foreach (array_slice($arguments, 1) as $argument) {
-            if (is_string($argument) && !str_starts_with($argument, '--')) {
-                $name = $argument;
-                break;
+        foreach ($options as $option => $value) {
+            if (!in_array($option, ['seed', 'debug'], true)) {
+                throw new SeedFailed(sprintf('Onbekende optie "--%s" voor db:seed.', $option));
             }
         }
 
-        $seeded = (new SeedRunner(
+        if (in_array('--seed', $arguments, true) || ($options['seed'] ?? null) === '') {
+            throw new SeedFailed('Geef een seedernaam op met --seed=naam.');
+        }
+
+        $name = $options['seed'] ?? null;
+        $seedOptions = 0;
+        foreach (array_slice($arguments, 1) as $argument) {
+            if (is_string($argument) && str_starts_with($argument, '--seed=')) {
+                $seedOptions++;
+                if ($seedOptions > 1) {
+                    throw new SeedFailed('Geef --seed slechts één keer op.');
+                }
+            }
+            if (is_string($argument) && !str_starts_with($argument, '--')) {
+                if ($name !== null) {
+                    throw new SeedFailed('Geef slechts één seedernaam op, als argument of met --seed=naam.');
+                }
+                $name = $argument;
+            }
+        }
+
+        /** @var Application $app */
+        $app = require $bootstrap;
+
+        $seeded = (new SelectedSeedRunner(
             $app->container()->get(Connection::class),
             $root . '/database/seeders',
         ))->run($name);
