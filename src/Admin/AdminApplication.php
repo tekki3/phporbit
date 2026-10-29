@@ -18,15 +18,22 @@ use PhpOrbit\Admin\Controllers\Generate\MiddlewarePageController;
 use PhpOrbit\Admin\Controllers\Generate\MiddlewareSubmitController;
 use PhpOrbit\Admin\Controllers\Generate\MigrationPageController;
 use PhpOrbit\Admin\Controllers\Generate\MigrationSubmitController;
+use PhpOrbit\Admin\Controllers\Generate\ModelPageController;
+use PhpOrbit\Admin\Controllers\Generate\ModelSubmitController;
+use PhpOrbit\Admin\Controllers\Generate\SeedPageController;
+use PhpOrbit\Admin\Controllers\Generate\SeedSubmitController;
 use PhpOrbit\Admin\Controllers\GenerateKeyController;
 use PhpOrbit\Admin\Controllers\MailController;
 use PhpOrbit\Admin\Controllers\MigrationsController;
 use PhpOrbit\Admin\Controllers\OverviewController;
+use PhpOrbit\Admin\Controllers\RunPendingMailController;
+use PhpOrbit\Admin\Controllers\RunSeedersController;
 use PhpOrbit\Admin\Controllers\ResendFailedMailController;
 use PhpOrbit\Admin\Controllers\ResendMailController;
 use PhpOrbit\Admin\Controllers\RollbackMigrationsController;
 use PhpOrbit\Admin\Controllers\RoutesController;
 use PhpOrbit\Admin\Controllers\RunMigrationsController;
+use PhpOrbit\Admin\Controllers\SeedersController;
 use PhpOrbit\Admin\Controllers\SendTestMailController;
 use PhpOrbit\Admin\Controllers\SessionsController;
 use PhpOrbit\Admin\Controllers\StorageController;
@@ -152,8 +159,12 @@ final class AdminApplication
                 $routes->get('/mail', MailController::class, 'admin.mail');
                 $routes->post('/mail/{id:\d+}/resend', ResendMailController::class, 'admin.mail.resend');
                 $routes->post('/mail/resend-failed', ResendFailedMailController::class, 'admin.mail.resend-failed');
+                $routes->post('/mail/send-pending', RunPendingMailController::class, 'admin.mail.send-pending');
 
                 $routes->get('/routes', RoutesController::class, 'admin.routes');
+
+                $routes->get('/seeders', SeedersController::class, 'admin.seeders');
+                $routes->post('/seeders/run', RunSeedersController::class, 'admin.seeders.run');
 
                 $routes->get('/sessions', SessionsController::class, 'admin.sessions');
                 $routes->post('/sessions/gc', GcSessionsController::class, 'admin.sessions.gc');
@@ -172,6 +183,10 @@ final class AdminApplication
                 $routes->post('/generate/middleware', MiddlewareSubmitController::class, 'admin.generate.middleware.submit');
                 $routes->get('/generate/migration', MigrationPageController::class, 'admin.generate.migration');
                 $routes->post('/generate/migration', MigrationSubmitController::class, 'admin.generate.migration.submit');
+                $routes->get('/generate/model', ModelPageController::class, 'admin.generate.model');
+                $routes->post('/generate/model', ModelSubmitController::class, 'admin.generate.model.submit');
+                $routes->get('/generate/seed', SeedPageController::class, 'admin.generate.seed');
+                $routes->post('/generate/seed', SeedSubmitController::class, 'admin.generate.seed.submit');
 
                 $routes->get('/tools', ToolsController::class, 'admin.tools');
                 $routes->post('/tools/key', GenerateKeyController::class, 'admin.tools.key');

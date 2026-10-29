@@ -51,8 +51,14 @@
 
     <a class="tile" href="/generate">
         <span class="tile-label">Generate</span>
-        <span class="tile-value tile-value-text">5 generators</span>
-        <span class="tile-note">Class, controller, form, middleware, migration</span>
+        <span class="tile-value tile-value-text">7 generators</span>
+        <span class="tile-note">Class, controller, form, middleware, migration, model, seeder</span>
+    </a>
+
+    <a class="tile" href="/seeders">
+        <span class="tile-label">Database seeders</span>
+        <span class="tile-value tile-value-text">Manage</span>
+        <span class="tile-note">Run all, or choose one</span>
     </a>
 </div>
 @endsection

@@ -50,6 +50,10 @@
                 <svg class="nav-icon"><use href="#icon-mail"/></svg>
                 Mail
             </a>
+            <a class="nav-link" href="/seeders" @if($currentPath === '/seeders') aria-current="page" @endif>
+                <svg class="nav-icon"><use href="#icon-migrations"/></svg>
+                Seeders
+            </a>
             <a class="nav-link" href="/routes" @if($currentPath === '/routes') aria-current="page" @endif>
                 <svg class="nav-icon"><use href="#icon-routes"/></svg>
                 Routes
@@ -75,6 +79,8 @@
                 <a class="nav-sublink" href="/generate/form" @if($currentPath === '/generate/form') aria-current="page" @endif>Form</a>
                 <a class="nav-sublink" href="/generate/middleware" @if($currentPath === '/generate/middleware') aria-current="page" @endif>Middleware</a>
                 <a class="nav-sublink" href="/generate/migration" @if($currentPath === '/generate/migration') aria-current="page" @endif>Migration</a>
+                <a class="nav-sublink" href="/generate/model" @if($currentPath === '/generate/model') aria-current="page" @endif>Model</a>
+                <a class="nav-sublink" href="/generate/seed" @if($currentPath === '/generate/seed') aria-current="page" @endif>Seeder</a>
             </div>
         </div>
 

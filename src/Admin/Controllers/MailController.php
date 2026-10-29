@@ -29,9 +29,11 @@ final class MailController implements Handler
 
         try {
             $entries = $this->mail->list($status, limit: 100);
+            $pendingCount = $this->mail->count(MailStatus::Pending);
             $available = true;
         } catch (QueryFailed) {
             $entries = [];
+            $pendingCount = 0;
             $available = false;
         }
 
@@ -42,6 +44,7 @@ final class MailController implements Handler
             'currentPath' => '/mail',
             'csrfToken' => Csrf::token($this->session),
             'entries' => $entries,
+            'pendingCount' => $pendingCount,
             'status' => $status,
             'available' => $available,
             'flash' => $this->session->takeFlash('admin.notice'),

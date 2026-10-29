@@ -15,6 +15,12 @@
             <a href="/mail?status=pending" @if($status?->value === 'pending') class="current" @endif>Pending</a>
         </div>
 
+        @if($pendingCount > 0)
+            <form method="post" action="/mail/send-pending">
+                <input type="hidden" name="_token" value="{{ $csrfToken }}">
+                <button type="submit" class="button-primary">Deliver pending mail (up to 50)</button>
+            </form>
+        @endif
         <form method="post" action="/mail/resend-failed">
             <input type="hidden" name="_token" value="{{ $csrfToken }}">
             <button type="submit" class="button-primary">Resend all failed</button>

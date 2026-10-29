@@ -6,6 +6,12 @@ namespace PhpOrbit\Tests\Unit\Admin;
 
 use FilesystemIterator;
 use PhpOrbit\Admin\AdminApplication;
+use PhpOrbit\Config\Environment;
+use PhpOrbit\Database\Connection;
+use PhpOrbit\Database\DatabaseSettings;
+use PhpOrbit\Mail\MailLogRepository;
+use PhpOrbit\Mail\MailStatus;
+use PhpOrbit\Mail\Message;
 use PhpOrbit\Http\Method;
 use PhpOrbit\Http\Status;
 use PhpOrbit\Kernel\Application;
@@ -163,6 +169,38 @@ final class AdminGenerateAndToolsTest extends TestCase
         self::assertStringContainsString('CREATE TABLE articles', (string) file_get_contents($written[0]));
     }
 
+    public function test_generating_a_model_writes_the_class_and_bootstrap_guidance(): void
+    {
+        [$token, $cookies] = $this->csrfTokenAndCookies('/generate/model');
+
+        $response = $this->admin->handle(Requests::form('/generate/model', [
+            '_token' => $token,
+            'name' => 'Note',
+            'fields' => 'title:string,views:int',
+        ], $cookies));
+
+        self::assertSame(Status::Ok, $response->status);
+        self::assertFileExists($this->workspace . '/app/src/Models/Note.php');
+        self::assertStringContainsString('Model::useConnection($database)', $response->body);
+        self::assertStringContainsString('notes', (string) file_get_contents($this->workspace . '/app/src/Models/Note.php'));
+    }
+
+    public function test_generating_a_seeder_writes_the_same_template_as_the_cli(): void
+    {
+        [$token, $cookies] = $this->csrfTokenAndCookies('/generate/seed');
+
+        $response = $this->admin->handle(Requests::form('/generate/seed', [
+            '_token' => $token,
+            'name' => '0002_categories',
+        ], $cookies));
+
+        self::assertSame(Status::Ok, $response->status);
+        self::assertFileExists($this->workspace . '/database/seeders/0002_categories.php');
+        self::assertStringContainsString('Seeder', (string) file_get_contents(
+            $this->workspace . '/database/seeders/0002_categories.php',
+        ));
+    }
+
     // --- form ---------------------------------------------------------------
 
     public function test_generating_a_form_with_controllers_writes_the_route_snippet(): void
@@ -235,6 +273,71 @@ final class AdminGenerateAndToolsTest extends TestCase
         self::assertStringContainsString('nothing left this machine', $response->body);
     }
 
+    public function test_running_a_seeder_executes_it_through_the_database_seed_runner(): void
+    {
+        $seeders = $this->workspace . '/database/seeders';
+        mkdir($seeders, 0o755, true);
+        $marker = $this->workspace . '/seeder-ran';
+        file_put_contents($seeders . '/0001_test.php', sprintf(
+            <<<'PHP'
+                <?php
+                declare(strict_types=1);
+                return new class implements \PhpOrbit\Database\Seeder {
+                    public function run(\PhpOrbit\Database\Connection $database): void
+                    {
+                        file_put_contents(%s, 'ran');
+                    }
+                };
+                PHP,
+            var_export($marker, true),
+        ));
+
+        [$token, $cookies] = $this->csrfTokenAndCookies('/seeders');
+        $response = $this->admin->handle(Requests::form('/seeders/run', [
+            '_token' => $token,
+            'name' => '0001_test',
+        ], $cookies));
+
+        self::assertSame(Status::Found, $response->status);
+        self::assertSame('ran', file_get_contents($marker));
+
+        $page = $this->admin->handle(Requests::of(Method::Get, '/seeders', cookies: $cookies));
+        self::assertStringContainsString('Seeded: 0001_test', $page->body);
+    }
+
+    public function test_delivering_pending_mail_updates_the_existing_log_entry(): void
+    {
+        copy(
+            dirname(__DIR__, 3) . '/stubs/blank/database/migrations/0001_create_mail_log_table.php',
+            $this->workspace . '/database/migrations/0001_create_mail_log_table.php',
+        );
+        [$migrationToken, $migrationCookies] = $this->csrfTokenAndCookies('/migrations');
+        $this->admin->handle(Requests::form(
+            '/migrations/run',
+            ['_token' => $migrationToken],
+            $migrationCookies,
+        ));
+
+        $id = $this->mailLogRepository()->record(
+            Message::to('ada@example.test')->from('a@b.test')->subject('Queued')->text('Queued'),
+            MailStatus::Pending,
+            attempts: 0,
+        );
+        [$token, $cookies] = $this->csrfTokenAndCookies('/mail');
+
+        $response = $this->admin->handle(Requests::form(
+            '/mail/send-pending',
+            ['_token' => $token],
+            $cookies,
+        ));
+
+        self::assertSame(Status::Found, $response->status);
+        $entry = $this->mailLogRepository()->find($id);
+        self::assertNotNull($entry);
+        self::assertSame(MailStatus::Sent, $entry->status);
+        self::assertSame(1, $entry->attempts);
+    }
+
     public function test_sending_a_test_message_without_a_sender_is_refused(): void
     {
         [$token, $cookies] = $this->csrfTokenAndCookies('/tools');
@@ -295,8 +398,12 @@ final class AdminGenerateAndToolsTest extends TestCase
         yield 'form' => ['/generate/form'];
         yield 'middleware' => ['/generate/middleware'];
         yield 'migration' => ['/generate/migration'];
+        yield 'model' => ['/generate/model'];
+        yield 'seed' => ['/generate/seed'];
         yield 'key' => ['/tools/key'];
         yield 'mail-test' => ['/tools/mail-test'];
+        yield 'pending-mail' => ['/mail/send-pending'];
+        yield 'run-seeders' => ['/seeders/run'];
     }
 
     // --- helpers --------------------------------------------------------------
@@ -324,6 +431,13 @@ final class AdminGenerateAndToolsTest extends TestCase
         }
 
         return [$match[1], $cookies];
+    }
+
+    private function mailLogRepository(): MailLogRepository
+    {
+        $env = Environment::load($this->workspace . '/.env');
+
+        return new MailLogRepository(Connection::connect(DatabaseSettings::fromEnvironment($env, $this->workspace)));
     }
 
     private function removeTree(string $path): void

@@ -5,19 +5,19 @@ declare(strict_types=1);
 return [
     'slug' => 'admin-ui',
     'title' => 'The admin UI',
-    'summary' => 'A local web dashboard covering every orbit command that operates on a project — migrations, mail, the code generators, sessions and the template cache — started by orbit ui, wired into nothing else.',
+    'summary' => 'A local web dashboard for migrations, mail delivery, database seeders, every code generator, sessions and the template cache — started by orbit ui, wired into nothing else.',
     'body' => <<<'HTML'
 [[bash]]
 $ orbit ui
-Starting the admin UI — migrations, mail, routes, sessions, storage.
+Starting the admin UI — migrations, mail, routes, seeders, sessions, storage and generators.
 phporbit listening on http://127.0.0.1:8081 (production mode) — Ctrl-C to stop
 [[/bash]]
 
-<p>A second, self-contained web application for setting up and maintaining a project: how many migrations are pending, what mail failed to send and needs resending, what routes actually compiled, how much is sitting in the session store and the template cache — buttons to act on each, and forms for every <code>orbit make:*</code> generator besides. It reads and writes the same database, the same mail configuration and the same filesystem <code>orbit</code> itself uses; nothing here is a preview.</p>
+<p>A second, self-contained web application for setting up and maintaining a project: how many migrations are pending, what mail failed to send or is waiting for delivery, which routes compiled, which seeders are available, and how much is sitting in the session store and template cache. It also provides forms for every <code>orbit make:*</code> generator. It reads and writes the same database, mail configuration and filesystem <code>orbit</code> itself uses; nothing here is a preview.</p>
 
 <h2>Why a second application</h2>
 
-<p>It would be simpler to add these pages to <code>app/routes.php</code>. That is exactly why they are not there. A page that can run migrations, resend mail and wipe the template cache, merged into the real route table, ships with every deployment unless a developer remembers to strip it back out before going to production — and "remembers to remove it" is not a security boundary.</p>
+<p>It would be simpler to add these pages to <code>app/routes.php</code>. That is exactly why they are not there. A page that can run migrations and seeders, deliver mail and wipe the template cache, merged into the real route table, ships with every deployment unless a developer remembers to strip it back out before going to production — and "remembers to remove it" is not a security boundary.</p>
 
 <p>Instead, <code>Admin\AdminApplication::boot()</code> builds an independent <code>Kernel\Application</code> — its own routes, its own middleware, its own <code>TemplateEngine</code> pointed at templates that ship with the framework in <code>src/Admin/templates</code> rather than living in <code>app/templates</code>. It exists only for the lifetime of the process <code>orbit ui</code> starts. Nothing about running it changes what <code>app/routes.php</code> serves, and nothing about deploying normally exposes it.</p>
 
@@ -34,25 +34,32 @@ phporbit listening on http://127.0.0.1:8081 (production mode) — Ctrl-C to stop
 <tbody>
 <tr><td>Overview</td><td>One tile per area below</td><td>—</td></tr>
 <tr><td>Migrations</td><td>Every migration file, applied or pending, with its batch</td><td>Run pending, roll back the last batch</td></tr>
-<tr><td>Mail</td><td><code>mail_log</code>, filterable by status</td><td>Resend one message, resend every failed message</td></tr>
+<tr><td>Mail</td><td><code>mail_log</code>, filterable by status</td><td>Deliver up to 50 pending messages, resend one, resend every failed message</td></tr>
+<tr><td>Seeders</td><td>Seeder files in filename order</td><td>Run all seeders or one by name</td></tr>
 <tr><td>Routes</td><td>The project's real, compiled route table</td><td>—</td></tr>
 <tr><td>Sessions</td><td>Session files on disk</td><td>Remove the expired ones</td></tr>
 <tr><td>Storage</td><td>Compiled templates on disk, and their size</td><td>Clear the template cache</td></tr>
-<tr><td>Generate</td><td>Five forms: class, controller, form, middleware, migration</td><td>Write the file(s); show what the CLI would have printed</td></tr>
+<tr><td>Generate</td><td>Seven forms: class, controller, form, middleware, migration, model, seeder</td><td>Write the file(s); show what the CLI would have printed</td></tr>
 <tr><td>Tools</td><td>The configured mail driver</td><td>Print a new <code>APP_KEY</code>; send one real test message</td></tr>
 </tbody>
 </table>
 </div>
 
-<p>Every one of these is also a CLI command — <code>orbit migrate</code>, <code>orbit mail:list</code> / <code>mail:resend</code>, <code>orbit routes</code>, <code>orbit sessions:gc</code>, <code>orbit storage:clear</code>, <code>orbit make:*</code>, <code>orbit key:generate</code>, <code>orbit mail:test</code> — documented on <a href="cli.html">The orbit CLI</a>. The admin UI does not reimplement any of them: the same <code>Migrator</code>, the same <code>PersistingMailer</code>, the same <code>Console\*Maker</code> classes. A resend triggered from a button behaves identically to one triggered from a terminal, because it is the same call.</p>
+<p>These are the project-level CLI operations — <code>orbit migrate</code>, <code>orbit db:seed</code>, <code>orbit mail:list</code> / <code>mail:resend</code> / <code>mail:send-pending</code>, <code>orbit routes</code>, <code>orbit sessions:gc</code>, <code>orbit storage:clear</code>, every <code>orbit make:*</code> generator, <code>orbit key:generate</code> and <code>orbit mail:test</code> — documented on <a href="cli.html">The orbit CLI</a>. The UI reuses the same <code>Migrator</code>, <code>SeedRunner</code>, <code>PersistingMailer</code> and <code>Console\*Maker</code> classes. A delivery or generation triggered by a button uses the same service as its terminal equivalent.</p>
 
 <p>The routes page is worth being precise about: it reads <code>app/routes.php</code> directly — compiling a throwaway <code>RouteCollection</code> just to list what is in it — rather than serving those routes itself. The admin app's own router never touches them.</p>
 
 <h2>Generate</h2>
 
-<p>Five pages under <code>/generate</code>, one per <code>orbit make:*</code> command, each a plain form for the same options the CLI flags accept — a name, a lifetime, which fields a form should have. Submitting one calls the exact same <code>ClassMaker</code>, <code>ControllerMaker</code>, <code>FormMaker</code>, <code>MiddlewareMaker</code> or <code>MigrationMaker</code> the CLI uses, on the real project, and shows what it wrote — file paths, and the one or two lines still left to paste into <code>app/routes.php</code> or <code>app/bootstrap.php</code> by hand. Neither the CLI nor this UI edits those files for you; see <a href="cli.html">The orbit CLI</a> for why.</p>
+<p>Seven pages under <code>/generate</code>, one per <code>orbit make:*</code> command, each a plain form for the same options the CLI flags accept — a name, a lifetime, or model fields. Submitting one calls the same maker class the CLI uses, on the real project, and shows what it wrote — file paths, and any lines still left to paste into <code>app/routes.php</code> or <code>app/bootstrap.php</code>. Neither the CLI nor this UI edits those files for you; see <a href="cli.html">The orbit CLI</a> for why.</p>
 
 <p>A submission that fails — a reserved word, a name that collides with an existing file, a field name that clashes with a form's own honeypot — redisplays the same form with the message and what was typed, rather than a redirect that would lose both. A successful one clears the name field but keeps the other choices, so generating several related classes with the same lifetime is a few clicks, not a re-selection each time.</p>
+
+<h2>Seeders</h2>
+
+<p>The Seeders page lists files from <code>database/seeders/</code> and lets you run all of them in filename order or select one. It calls the framework's <code>SeedRunner</code>, just like <code>orbit db:seed</code>. Seeders run on every invocation and have no migration ledger, so their database writes must be idempotent. Running a seeder executes project PHP code; only use the unauthenticated UI locally or through a trusted tunnel.</p>
+
+<p>The Mail page also has a Deliver pending action, equivalent to <code>orbit mail:send-pending</code>. It processes up to 50 queued messages per submission and records each outcome on its existing <code>mail_log</code> row.</p>
 
 <h2>Tools</h2>
 
@@ -60,7 +67,7 @@ phporbit listening on http://127.0.0.1:8081 (production mode) — Ctrl-C to stop
 
 <h2>State-changing actions are still forms</h2>
 
-<p>Every action — running a migration, resending mail, clearing a cache — is an ordinary <code>&lt;form method="post"&gt;</code> carrying a CSRF token, checked by the same <code>CsrfMiddleware</code> every other phporbit application uses. There is no JavaScript anywhere in this interface, matching the rule the framework's own demo holds itself to: no <code>&lt;script&gt;</code>, no inline <code>style=</code>, no <code>onclick</code>. A destructive-looking action like "roll back last batch" is not gated behind a confirmation dialog, because that would need one — the button's label is the only warning it gets, the same way <code>notes.orbit.php</code>'s delete button works in the demo application.</p>
+<p>Every action — running a migration or seeder, delivering mail, clearing a cache — is an ordinary <code>&lt;form method="post"&gt;</code> carrying a CSRF token, checked by the same <code>CsrfMiddleware</code> every other phporbit application uses. There is no JavaScript anywhere in this interface, matching the rule the framework's own demo holds itself to: no <code>&lt;script&gt;</code>, no inline <code>style=</code>, no <code>onclick</code>. A destructive-looking action like "roll back last batch" is not gated behind a confirmation dialog, because that would need one — the button's label is the only warning it gets, the same way <code>notes.orbit.php</code>'s delete button works in the demo application.</p>
 
 <h2>Session cookie</h2>
 

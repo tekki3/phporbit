@@ -11,7 +11,7 @@ declare(strict_types=1);
  * that worker-safety problems surface locally.
  */
 
-use App\Support\SelectedSeedRunner;
+use PhpOrbit\Database\SeedRunner;
 use PhpOrbit\Admin\AdminApplication;
 use PhpOrbit\Config\Environment;
 use PhpOrbit\Config\InvalidEnvFile;
@@ -514,7 +514,7 @@ try {
 
         $admin = AdminApplication::boot($root);
 
-        fwrite(STDERR, 'Starting the admin UI — migrations, mail, routes, sessions, storage.' . PHP_EOL);
+        fwrite(STDERR, 'Starting the admin UI — migrations, mail, routes, seeders, sessions, storage and generators.' . PHP_EOL);
 
         $server = new OrbitServer(
             host: $host,
@@ -606,7 +606,7 @@ try {
         /** @var Application $app */
         $app = require $bootstrap;
 
-        $seeded = (new SelectedSeedRunner(
+        $seeded = (new SeedRunner(
             $app->container()->get(Connection::class),
             $root . '/database/seeders',
         ))->run($name);

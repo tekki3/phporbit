@@ -39,5 +39,17 @@
         <span class="tile-value tile-value-text">make:migration</span>
         <span class="tile-note">Schema shaped from the name — create, alter, or blank.</span>
     </a>
+
+    <a class="tile" href="/generate/model">
+        <span class="tile-label">Model</span>
+        <span class="tile-value tile-value-text">make:model</span>
+        <span class="tile-note">A typed model for one table, with optional field mappings.</span>
+    </a>
+
+    <a class="tile" href="/generate/seed">
+        <span class="tile-label">Seeder</span>
+        <span class="tile-value tile-value-text">make:seed</span>
+        <span class="tile-note">A database seeder to edit and run from the Seeders page.</span>
+    </a>
 </div>
 @endsection

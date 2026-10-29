@@ -444,7 +444,7 @@ try {
 
         $admin = AdminApplication::boot($root);
 
-        fwrite(STDERR, 'Starting the admin UI — migrations, mail, routes, sessions, storage.' . PHP_EOL);
+        fwrite(STDERR, 'Starting the admin UI — migrations, mail, routes, seeders, sessions, storage and generators.' . PHP_EOL);
 
         $server = new OrbitServer(
             host: $host,
