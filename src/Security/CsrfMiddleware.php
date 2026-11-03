@@ -51,12 +51,11 @@ final class CsrfMiddleware implements Middleware
     }
 
     /**
-     * A route with no match (a 404) has nothing to exempt, and cannot change
-     * state anyway.
+     * Unmatched routes cannot invoke a handler; preserve their 404/405.
      */
     private function isExempt(RequestScope $scope): bool
     {
-        return $scope->provided(Route::class) && $scope->get(Route::class)->csrfExempt;
+        return !$scope->provided(Route::class) || $scope->get(Route::class)->csrfExempt;
     }
 
     /**

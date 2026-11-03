@@ -38,6 +38,14 @@ final class RoutesFileTest extends TestCase
         sort($names);
 
         self::assertSame([
+            'api.docs',
+            'api.openapi',
+            'api.tokens',
+            'api.tokens.create',
+            'api.tokens.revoke',
+            'api.v1.me',
+            'api.v1.revoke',
+            'api.v1.token',
             'avatar',
             'avatar.store',
             'contact',
@@ -81,6 +89,7 @@ final class RoutesFileTest extends TestCase
         $guarded = [
             'notes.create', 'notes.delete', 'avatar', 'avatar.store', 'security',
             'mfa.enroll', 'mfa.enable', 'mfa.disable', 'oidc.link', 'oidc.unlink',
+            'api.tokens', 'api.tokens.create', 'api.tokens.revoke',
         ];
 
         foreach ($guarded as $name) {

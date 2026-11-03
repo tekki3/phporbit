@@ -233,6 +233,57 @@ final class AuthKitTest extends TestCase
         self::assertSame(1, $this->database->query('auth_management')->count());
     }
 
+    public function test_generated_api_supports_json_login_personal_tokens_mfa_and_revocation(): void
+    {
+        $this->createAccount('api@example.test');
+        $json = static function (string $email, string $code = ''): string {
+            return json_encode(['email' => $email, 'password' => 'correct-horse-battery', 'code' => $code], JSON_THROW_ON_ERROR);
+        };
+        $login = $this->api(Method::Post, '/api/v1/token', $json('api@example.test'));
+        self::assertSame(200, $login->status->value, $login->body);
+        $data = json_decode($login->body, true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($data);
+        $bearer = $data['access_token'] ?? null;
+        self::assertIsString($bearer);
+        $profile = $this->api(Method::Get, '/api/v1/me', bearer: $bearer);
+        self::assertSame(['id' => '1', 'name' => 'Test member'], json_decode($profile->body, true));
+        self::assertSame(401, $this->api(Method::Get, '/api/v1/me')->status->value);
+        $this->get('/login');
+        $this->post('/login', ['email' => 'api@example.test', 'password' => 'correct-horse-battery']);
+        self::assertSame(401, $this->api(Method::Get, '/api/v1/me')->status->value, 'Browser cookies never authorize API requests.');
+        $this->get('/account/tokens');
+        $created = $this->post('/account/tokens', ['name' => 'Generated CLI', 'password' => 'correct-horse-battery']);
+        self::assertSame(1, preg_match('/orbit_pat_[a-f0-9]{32}_[a-f0-9]{64}/', $created->body, $match));
+        self::assertIsString($match[0] ?? null);
+        self::assertSame(200, $this->api(Method::Get, '/api/v1/me', bearer: $match[0])->status->value);
+        self::assertStringNotContainsString($match[0], $this->get('/account/tokens')->body, 'Plain token is shown only once.');
+        self::assertSame(204, $this->api(Method::Delete, '/api/v1/token', bearer: $bearer)->status->value);
+        self::assertSame(401, $this->api(Method::Get, '/api/v1/me', bearer: $bearer)->status->value);
+        $mfa = $this->app->container()->get(\PhpOrbit\Auth\Mfa::class);
+        $secret = Totp::secret();
+        $codes = $mfa->enable('1', $secret, Totp::code($secret, time()));
+        self::assertSame(401, $this->api(Method::Get, '/api/v1/me', bearer: $match[0])->status->value, 'MFA changes invalidate personal tokens.');
+        self::assertSame(401, $this->api(Method::Post, '/api/v1/token', $json('api@example.test'))->status->value);
+        self::assertSame(200, $this->api(Method::Post, '/api/v1/token', $json('api@example.test', $codes[0]))->status->value);
+        self::assertSame(401, $this->api(Method::Post, '/api/v1/token', $json('api@example.test', $codes[0]))->status->value);
+        self::assertSame(200, $this->get('/api/docs')->status->value);
+        self::assertStringContainsString('3.0.3', $this->get('/api/openapi.json')->body);
+    }
+
+    private function api(Method $method, string $url, string $body = '', ?string $bearer = null): Response
+    {
+        $headers = ['Content-Type' => 'application/json'];
+        if ($bearer !== null) {
+            $headers['Authorization'] = 'Bearer ' . $bearer;
+        }
+        $response = $this->app->handle(new ServerRequest(
+            $method, Uri::fromRequestTarget($url, 'http', 'localhost', 8080),
+            Headers::fromArray($headers), $body, $this->cookies,
+        ));
+        self::assertLessThan(500, $response->status->value, $response->body);
+        return $response;
+    }
+
     private function createAccount(string $email): void
     {
         $this->registration->request($email, 'Test member', 'correct-horse-battery');

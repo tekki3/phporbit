@@ -38,6 +38,9 @@ final class HtmlErrorPages implements Middleware
 
     public function process(ServerRequest $request, RequestScope $scope, Closure $next): Response
     {
+        if ($request->uri->path === '/api' || str_starts_with($request->uri->path, '/api/')) {
+            return $next($request);
+        }
         try {
             $response = $next($request);
         } catch (Throwable $e) {

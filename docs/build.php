@@ -34,7 +34,7 @@ const OUT = __DIR__;
  */
 const NAV = [
     'Start here' => ['index', 'getting-started', 'architecture', 'configuration'],
-    'Handling requests' => ['routing', 'controllers', 'requests', 'responses', 'forms'],
+    'Handling requests' => ['routing', 'controllers', 'requests', 'responses', 'forms', 'api'],
     'Building blocks' => ['container', 'middleware', 'templates'],
     'Data' => ['database', 'queries', 'migrations', 'models', 'caching'],
     'Users and safety' => ['security', 'sessions', 'auth', 'advanced-auth', 'validation', 'uploads', 'encryption'],

@@ -119,6 +119,12 @@ registration, MFA and admin user management. New blank bootstraps load its
 `app/auth.php` hook. Every account starts as a member; `orbit auth:admin <email>`
 promotes a verified account from the operator's terminal. Do not remove the
 password/MFA checks, administrator guard, lock row or session revocation.
+The auth module also provides `/api/v1` routes, JWTs, revocable personal
+Bearer tokens and local Swagger UI. API routes use `RequireBearer`, never
+browser-session authorization; `Principal` is request-local. Never grant
+client-selected scopes or bypass MFA for token issuance. Install `ApiResponses`
+before other error middleware, and use the shared database `RateLimiter`,
+not process-local counters. Only `/api/docs` opts into local JavaScript.
 
 `Message::to(...)->subject(...)->text(...)`, sent through the injected `Mailer`.
 CR/LF in a subject, display name or address is refused — that is header

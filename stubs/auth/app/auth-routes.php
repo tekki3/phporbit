@@ -8,6 +8,9 @@ use PhpOrbit\Auth\RequireAuthentication;
 use PhpOrbit\Routing\RouteCollection;
 
 return static function (RouteCollection $routes, bool $debug): void {
+    \App\AuthKit\ApiDefinition::register($routes);
+    $routes->get('/api/openapi.json', Auth\Api\OpenApiController::class, 'api.openapi');
+    $routes->get('/api/docs', Auth\Api\SwaggerController::class, 'api.docs');
     $routes->get('/login', Auth\LoginController::class, 'login');
     $routes->post('/login', Auth\LoginAttemptController::class, 'login.attempt');
     $routes->post('/logout', Auth\LogoutController::class, 'logout');
@@ -31,6 +34,9 @@ return static function (RouteCollection $routes, bool $debug): void {
         $routes->get('/account', Auth\ProfileController::class, 'account');
         $routes->post('/account', Auth\ProfileUpdateController::class, 'account.update');
         $routes->get('/account/security', Auth\SecurityController::class, 'security');
+        $routes->get('/account/tokens', Auth\ApiTokensController::class, 'api.tokens');
+        $routes->post('/account/tokens', Auth\ApiTokenCreateController::class, 'api.tokens.create');
+        $routes->post('/account/tokens/{id:[a-f0-9]+}/revoke', Auth\ApiTokenRevokeController::class, 'api.tokens.revoke');
         $routes->post('/account/mfa/enroll', Auth\MfaEnrollController::class, 'mfa.enroll');
         $routes->post('/account/mfa/enable', Auth\MfaEnableController::class, 'mfa.enable');
         $routes->post('/account/mfa/disable', Auth\MfaDisableController::class, 'mfa.disable');

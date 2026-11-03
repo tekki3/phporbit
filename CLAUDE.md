@@ -352,6 +352,20 @@ Two details worth keeping if you edit it:
 
 `composer.lock` is git-ignored (this is a library), so CI resolves dependencies fresh. That is intentional: it means a transitive break in phpstan or phpunit shows up here rather than the first time someone installs.
 
+## API support
+
+`Api\VersionedRoutes` is a boot-only builder for `/api/vN` routes and OpenAPI
+operations from one declaration. `Api\OpenApi` is the immutable snapshot.
+`RequireBearer` provides a request-local `Principal`, never a browser
+`Authenticator`. JWTs and personal tokens both require a hashed database record
+and current password/security stamp; changing JWTs to stateless verification
+would remove immediate revocation. HS256 is fixed, using a distinct derived key.
+`RateLimiter` writes its lock row before reading counters and owns a transaction;
+do not replace it with a worker-local or non-atomic read/write cache counter.
+`ApiResponses` handles JSON failures ahead of HTML error rendering.
+The demo and `make:auth` share API controllers, definitions, token pages and
+local Swagger assets; preserve both surfaces and validate generated code too.
+
 ## Learning curve
 
 Convention over configuration, minimum ceremony between install and a route returning a response. This trades against nothing in the safety model — defaults are both convenient *and* safe. **If a proposed convenience requires weakening a security or type guarantee, the convenience is wrong.** Controllers are single-action classes implementing `Routing\Handler` for exactly this reason: a `[Controller::class, 'method']` pair can only be called dynamically, which returns `mixed`.
@@ -425,7 +439,7 @@ An occupied target directory is refused unless `--force`; `.env` is never overwr
 
 ## Developer documentation
 
-`docs/` holds 26 self-contained HTML pages — open `docs/index.html` directly, no server or toolchain needed. Regenerate with `php docs/build.php`.
+`docs/` holds 31 self-contained HTML pages — open `docs/index.html` directly, no server or toolchain needed. Regenerate with `php docs/build.php`.
 
 They are also served by the running app at **`/docs`**, linked from the masthead. That works via a second `ServeStaticFiles` mounted with `prefix: '/docs'` pointing at `docs/`, rather than copying generated HTML into `public/` — one source of truth, nothing duplicated into the document root. A symlink would not work: `ServeStaticFiles` resolves with `realpath()` and refuses anything outside its root.
 
@@ -435,7 +449,15 @@ When you change an API, update the page that documents it. Several examples in t
 
 ## Demo interface
 
-**All CSS lives in two external stylesheets and there is no JavaScript at all** — no `<style>` blocks, no `style=` attributes, no `<script>`. Keep it that way: presentation belongs in `public/assets/app.css` (application) or `docs/assets/docs.css` (documentation). Where a value is data-driven, reach for an element that carries it natively — the self-check meter is a `<progress value max>` rather than a `<div>` with an inline width, which also means assistive technology reads it without an `aria-label` describing a `<div>`.
+**Application forms and developer documentation remain JavaScript-free.**
+The explicit exception is `/api/docs`: locally vendored Swagger UI, its
+external initializer and shell stylesheet, with a page-specific CSP.
+Do not extend that exception to the application layout or auth forms.
+Swagger's Apache LICENSE/NOTICE must ship with the pinned assets; keep the
+online validator and persistent authorization disabled. No CDN is used.
+Presentation otherwise belongs in `public/assets/app.css` (application) or
+`docs/assets/docs.css` (documentation), without inline styles.
+Where a value is data-driven, reach for a native element such as `<progress>`.
 
 `public/assets/app.css` is a small design system sharing tokens with `docs/assets/docs.css`, so the application and its documentation read as one thing. **Dark is the base palette; light is a full token swap under `prefers-color-scheme`, not an inversion.** Anything new should use the tokens rather than literal colours.
 

@@ -25,6 +25,10 @@ use App\Support\ScopedProbe;
 use App\Support\WorkerStats;
 use App\Support\AuthEmails;
 use PhpOrbit\Auth\Authenticator;
+use PhpOrbit\Api\ApiResponses;
+use PhpOrbit\Api\RateLimiter;
+use PhpOrbit\Api\Tokens;
+use PhpOrbit\Crypto\Key;
 use PhpOrbit\Auth\LoginThrottle;
 use PhpOrbit\Auth\PasswordHasher;
 use PhpOrbit\Auth\UserProvider;
@@ -168,6 +172,12 @@ return Application::boot(
         $securityState = new SecurityState($database);
         $providers = OidcProviders::fromEnvironment($env);
         $app->container->singleton(SecurityState::class, static fn (): SecurityState => $securityState);
+        $app->container->singleton(RateLimiter::class, static fn (): RateLimiter => new RateLimiter($database));
+        $app->container->singleton(Tokens::class, static fn (): Tokens => new Tokens(
+            $database, $users, $securityState, static fn (): Key => Key::fromString($env->required('APP_KEY')),
+            $env->string('API_JWT_ISSUER', $env->string('APP_URL', 'http://localhost:8080')),
+            $env->string('API_JWT_AUDIENCE', 'phporbit-api'),
+        ));
         $app->container->singleton(OidcProviders::class, static fn (): OidcProviders => $providers);
         $app->container->singleton(OidcHttp::class, static fn (): OidcHttp => new CurlOidcHttp());
         $app->container->singleton(Mfa::class, static fn (): Mfa => new Mfa(
@@ -218,6 +228,7 @@ return Application::boot(
         // turned into an opaque page; static files short-circuit before any
         // session work; CSRF must follow the session that holds its token.
         $middleware = [
+            new ApiResponses(),
             new HtmlErrorPages($templates, $debug),
             new LogRequests($logger),
             new ServeStaticFiles($root . '/public', maxAgeSeconds: $cacheSeconds),

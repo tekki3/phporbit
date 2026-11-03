@@ -143,6 +143,11 @@ your email, `php orbit auth:admin you@example.com` appoints the first admin.
 See [authentication scaffolding](docs/advanced-auth.html) for setup; it never
 overwrites files or replaces existing demo authentication.
 
+API support includes JWT access tokens, revocable personal Bearer tokens,
+`/api/v1` routes, database-backed rate limits and locally hosted Swagger UI.
+Visit `/api/docs` and manage personal tokens at `/account/tokens`.
+See [APIs](docs/api.html) for the framework APIs and security requirements.
+
 `php orbit ui` opens a separate admin dashboard at <http://127.0.0.1:8081>
 for generators, migrations, mail and storage. **It has no login: keep the
 default loopback binding and never expose it publicly.**
@@ -221,4 +226,5 @@ constraints and contributor expectations.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Vendored Swagger UI retains its Apache-2.0
+license and notice in `public/assets/swagger/`.

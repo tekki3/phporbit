@@ -3,6 +3,7 @@
 @section('content')
 <div class="prose">
     <h1>Account security</h1>
+    <p><a href="/account/tokens">Manage personal API tokens</a> · <a href="/api/docs">API reference</a></p>
     @if($notice)<p class="verdict verdict-pass" role="status">{{ $notice }}</p>@endif
     @if($error)<p class="verdict verdict-fail" role="alert">{{ $error }}</p>@endif
     <h2>Authenticator</h2>

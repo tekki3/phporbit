@@ -32,6 +32,7 @@ use PhpOrbit\Log\Level;
 use PhpOrbit\Log\LogRequests;
 use PhpOrbit\Log\Logger;
 use PhpOrbit\Log\LoggerFactory;
+use PhpOrbit\Api\ApiResponses;
 use PhpOrbit\Mail\Mailer;
 use PhpOrbit\Mail\MailerFactory;
 use PhpOrbit\Mail\MailLogRepository;
@@ -137,6 +138,7 @@ return Application::boot(
         // files short-circuit before any session work; CSRF must follow the
         // session that holds its token.
         $app->middleware(
+            new ApiResponses(),
             new LogRequests($logger),
             new ServeStaticFiles($root . '/public', maxAgeSeconds: $debug ? 0 : 3600),
             new SessionMiddleware(

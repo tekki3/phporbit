@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use PhpOrbit\Auth\SecurityMigration;
+use PhpOrbit\Api\ApiMigration;
 use PhpOrbit\Database\Connection;
 use PhpOrbit\Database\Migration;
 
@@ -28,10 +29,12 @@ return new class implements Migration {
         )");
         $database->executeSchema('CREATE INDEX auth_attempts_lookup ON auth_attempts (attempt_key, attempted_at)');
         (new SecurityMigration())->up($database);
+        (new ApiMigration())->up($database);
     }
 
     public function down(Connection $database): void
     {
+        (new ApiMigration())->down($database);
         (new SecurityMigration())->down($database);
         foreach (['auth_attempts', 'auth_management', 'auth_registrations', 'auth_users'] as $table) {
             $database->executeSchema('DROP TABLE ' . $table);

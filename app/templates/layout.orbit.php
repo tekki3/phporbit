@@ -47,6 +47,7 @@
         <a href="/" @if(($currentPath ?? '') === '/') class="current" aria-current="page" @endif>Self-check</a>
         <a href="/notes" @if(($currentPath ?? '') === '/notes') class="current" aria-current="page" @endif>Notes</a>
         <a href="/contact" @if(($currentPath ?? '') === '/contact') class="current" aria-current="page" @endif>Contact</a>
+        <a href="/api/docs">API</a>
         <a href="/hello/world" @if(($currentPath ?? '') === '/hello') class="current" aria-current="page" @endif>Escaping</a>
         @if($hasDocs)
             <a href="/docs/">Docs</a>

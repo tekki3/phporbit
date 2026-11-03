@@ -155,6 +155,13 @@ final class CsrfTest extends TestCase
         self::assertSame(Status::Ok, $app->handle(Requests::form('/webhook', []))->status);
     }
 
+    public function test_unmatched_state_changing_requests_keep_routing_statuses(): void
+    {
+        $app = $this->application();
+        self::assertSame(Status::NotFound, $app->handle(Requests::post('/missing'))->status);
+        self::assertSame(Status::MethodNotAllowed, $app->handle(Requests::of(Method::Delete, '/thing'))->status);
+    }
+
     private function application(): Application
     {
         $store = new ArraySessionStore();

@@ -147,6 +147,14 @@ administrator, `/account/users`. Members cannot grant themselves privileges.
 All primary sign-in methods still require MFA when enabled. Google/Entra
 remain optional. Registration/reset/login emails bypass the readable mail log.
 
+The generated module also includes `/api/v1/token` (JSON password/MFA login),
+`/api/v1/me` (Bearer-protected profile), token revocation and database-backed
+rate limits. Manage personal tokens at `/account/tokens`; use locally hosted
+Swagger UI at `/api/docs` or fetch `/api/openapi.json`. Only the Swagger page
+uses JavaScript. JWTs expire after fifteen minutes, personal tokens after
+thirty days. Require HTTPS in production; never log tokens or put them in URLs.
+See `vendor/phporbit/phporbit/docs/api.html` for configuration and extension.
+
 New blank projects load `app/auth.php` automatically. Older projects need the
 boot callback line printed by the generator. Demo projects already have
 authentication and cannot be overlaid. Edit the generated files in

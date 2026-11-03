@@ -48,6 +48,9 @@ final class AuthMakerTest extends TestCase
             'app/src/AuthKit/Controllers/RegisterController.php', 'app/src/AuthKit/Controllers/MfaVerifyController.php',
             'app/src/AuthKit/Controllers/UsersController.php', 'app/templates/auth-kit/login.orbit.php',
             'public/assets/css/auth.css', 'tests/AuthKitTest.php',
+            'app/src/AuthKit/ApiDefinition.php', 'app/src/AuthKit/Controllers/Api/SwaggerController.php',
+            'public/assets/swagger/LICENSE', 'public/assets/swagger/NOTICE',
+            'public/assets/js/swagger.js', 'public/assets/css/swagger-shell.css',
         ] as $path) {
             self::assertContains($path, $files);
             self::assertFileExists($this->project . '/' . $path);
@@ -122,7 +125,7 @@ final class AuthMakerTest extends TestCase
             . ' ' . escapeshellarg($this->project . '/tests/AuthKitTest.php') . ' 2>&1';
         exec($command, $output, $status);
         self::assertSame(0, $status, implode("\n", $output));
-        self::assertStringContainsString('OK (4 tests', implode("\n", $output));
+        self::assertStringContainsString('OK (5 tests', implode("\n", $output));
     }
 
     public function test_scaffolded_cli_generates_without_booting_or_touching_the_database(): void

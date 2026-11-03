@@ -46,6 +46,9 @@ return static function (RouteCollection $routes, bool $debug): void {
     $routes->get('/contact', ContactController::class, 'contact');
     $routes->post('/contact', SubmitContactController::class, 'contact.submit');
     $routes->get('/health', HealthController::class, 'health');
+    App\Support\ApiDefinition::register($routes);
+    $routes->get('/api/openapi.json', App\Controllers\Api\OpenApiController::class, 'api.openapi');
+    $routes->get('/api/docs', App\Controllers\Api\SwaggerController::class, 'api.docs');
 
     // ------------------------------------------------------------------ auth
     // Signing in and out. Sign-out is a POST rather than a link because a link
@@ -79,6 +82,9 @@ return static function (RouteCollection $routes, bool $debug): void {
         $routes->get('/avatar', AvatarController::class, 'avatar');
         $routes->post('/avatar', StoreAvatarController::class, 'avatar.store');
         $routes->get('/account/security', App\Controllers\SecurityController::class, 'security');
+        $routes->get('/account/tokens', App\Controllers\ApiTokensController::class, 'api.tokens');
+        $routes->post('/account/tokens', App\Controllers\ApiTokenCreateController::class, 'api.tokens.create');
+        $routes->post('/account/tokens/{id:[a-f0-9]+}/revoke', App\Controllers\ApiTokenRevokeController::class, 'api.tokens.revoke');
         $routes->post('/account/mfa/enroll', App\Controllers\MfaEnrollController::class, 'mfa.enroll');
         $routes->post('/account/mfa/enable', App\Controllers\MfaEnableController::class, 'mfa.enable');
         $routes->post('/account/mfa/disable', App\Controllers\MfaDisableController::class, 'mfa.disable');

@@ -56,12 +56,13 @@ final class AuthMaker
             'MagicLink', 'MagicEmail', 'MagicConfirm', 'MagicLogin', 'MfaChallenge',
             'MfaVerify', 'MfaEnroll', 'MfaEnable', 'MfaDisable', 'Security',
             'OidcStart', 'OidcLink', 'OidcCallback', 'OidcUnlink',
+            'ApiTokens', 'ApiTokenCreate', 'ApiTokenRevoke',
         ] as $name) {
             $files['app/src/AuthKit/Controllers/' . $name . 'Controller.php'] = $this->adapt(
                 $this->read($framework . '/app/src/Controllers/' . $name . 'Controller.php'),
             );
         }
-        foreach (['AccountSecurity', 'AuthEmails', 'AuthPage'] as $name) {
+        foreach (['AccountSecurity', 'AuthEmails', 'AuthPage', 'ApiDefinition'] as $name) {
             $contents = $this->adapt($this->read($framework . '/app/src/Support/' . $name . '.php'));
             if ($name === 'AuthPage') {
                 $contents = str_replace(
@@ -82,6 +83,14 @@ final class AuthMaker
             );
         }
         $files['public/assets/css/auth.css'] = $this->read($framework . '/public/assets/app.css');
+        foreach (glob($framework . '/app/src/Controllers/Api/*.php') ?: [] as $controller) {
+            $files['app/src/AuthKit/Controllers/Api/' . basename($controller)] = $this->adapt($this->read($controller));
+        }
+        foreach (glob($framework . '/public/assets/swagger/*') ?: [] as $asset) {
+            $files['public/assets/swagger/' . basename($asset)] = $this->read($asset);
+        }
+        $files['public/assets/js/swagger.js'] = $this->read($framework . '/public/assets/js/swagger.js');
+        $files['public/assets/css/swagger-shell.css'] = $this->read($framework . '/public/assets/css/swagger-shell.css');
         $migration = $files['database/migrations/create_auth_kit.php'];
         unset($files['database/migrations/create_auth_kit.php']);
         $files['database/migrations/' . gmdate('YmdHis') . '_create_auth_kit.php'] = $migration;
@@ -134,8 +143,8 @@ final class AuthMaker
     private function adapt(string $source): string
     {
         return str_replace(
-            ['namespace App\\Controllers;', 'App\\Support\\', 'namespace App\\Support;'],
-            ['namespace App\\AuthKit\\Controllers;', 'App\\AuthKit\\', 'namespace App\\AuthKit;'],
+            ['namespace App\\Controllers;', 'namespace App\\Controllers\\', 'use App\\Controllers\\', 'App\\Support\\', 'namespace App\\Support;', 'use App\\Auth\\User;'],
+            ['namespace App\\AuthKit\\Controllers;', 'namespace App\\AuthKit\\Controllers\\', 'use App\\AuthKit\\Controllers\\', 'App\\AuthKit\\', 'namespace App\\AuthKit;', 'use App\\AuthKit\\User;'],
             $source,
         );
     }

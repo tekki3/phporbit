@@ -67,6 +67,7 @@ ENTRA_TENANT_IDS=11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-22
 
 <h2>Reusable framework APIs</h2>
 <h3>Scaffold a complete authentication module</h3>
+<p>Generated modules also include <a href="api.html">versioned APIs</a>: JWT login with MFA, personal Bearer tokens managed at <code>/account/tokens</code>, shared rate limits and locally hosted Swagger UI at <code>/api/docs</code>. Browser account forms remain script-free.</p>
 [[bash]]
 php orbit new my-app
 cd my-app

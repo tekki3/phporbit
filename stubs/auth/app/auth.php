@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\AuthKit\Accounts;
 use App\AuthKit\AuthEmails;
 use App\AuthKit\Registration;
+use PhpOrbit\Api\RateLimiter;
+use PhpOrbit\Api\Tokens;
+use PhpOrbit\Crypto\Key;
 use PhpOrbit\Auth\Authenticator;
 use PhpOrbit\Auth\EmailTokens;
 use PhpOrbit\Auth\Identity;
@@ -34,6 +37,13 @@ return static function (Blueprint $app, Environment $env, string $root): void {
         $c->get(Connection::class), $c->get(SecurityState::class),
     ));
     $app->container->singleton(UserProvider::class, static fn (Container $c): UserProvider => $c->get(Accounts::class));
+    $app->container->singleton(RateLimiter::class, static fn (Container $c): RateLimiter => new RateLimiter($c->get(Connection::class)));
+    $app->container->singleton(Tokens::class, static fn (Container $c): Tokens => new Tokens(
+        $c->get(Connection::class), $c->get(UserProvider::class), $c->get(SecurityState::class),
+        static fn (): Key => Key::fromString($env->required('APP_KEY')),
+        $env->string('API_JWT_ISSUER', $env->string('APP_URL', 'http://localhost:8080')),
+        $env->string('API_JWT_AUDIENCE', 'phporbit-api'),
+    ));
     $app->container->singleton(LoginThrottle::class, static fn (Container $c): LoginThrottle => new LoginThrottle(
         $c->get(Connection::class), $env->int('LOGIN_MAX_ATTEMPTS', 5), $env->int('LOGIN_WINDOW_SECONDS', 900),
     ));

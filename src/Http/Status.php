@@ -19,6 +19,7 @@ enum Status: int
     case MethodNotAllowed = 405;
     case Conflict = 409;
     case PayloadTooLarge = 413;
+    case UnsupportedMediaType = 415;
     case UnprocessableEntity = 422;
     case TooManyRequests = 429;
     case InternalServerError = 500;
@@ -41,6 +42,7 @@ enum Status: int
             self::MethodNotAllowed => 'Method Not Allowed',
             self::Conflict => 'Conflict',
             self::PayloadTooLarge => 'Payload Too Large',
+            self::UnsupportedMediaType => 'Unsupported Media Type',
             self::UnprocessableEntity => 'Unprocessable Entity',
             self::TooManyRequests => 'Too Many Requests',
             self::InternalServerError => 'Internal Server Error',
