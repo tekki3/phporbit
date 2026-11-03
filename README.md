@@ -25,8 +25,8 @@ The built-in server uses PHP streams; `sockets` and `pcntl` are not required.
 
 ## Starting your own project
 
-Run each command in your terminal, one at a time. Install the project generator
-once:
+Run each command in your terminal, one at a time. Install the `orbit` project
+generator globally with Composer:
 
 ```bash
 composer global require phporbit/phporbit
@@ -34,13 +34,24 @@ composer global config bin-dir --absolute
 ```
 
 The second command prints the directory containing the global `orbit` command.
-If `orbit` is not found, add that directory to your user's `PATH` and open a new
-terminal. On Windows, edit your account's **Path** environment variable. On
-macOS/Linux, use this line and add it to your shell profile:
+Add that directory to your user's `PATH` if `orbit` is not found, then open a
+new terminal. On Windows, add the printed directory to your account's **Path**
+environment variable. On macOS/Linux, add this line to your shell profile:
 
 ```bash
 export PATH="$(composer global config bin-dir --absolute):$PATH"
 ```
+
+To update the globally installed CLI later, run:
+
+```bash
+composer global update phporbit/phporbit
+```
+
+This updates the CLI within the version constraint Composer has stored for the
+global installation. It does not update applications you have already created:
+inside an existing application, run `composer update phporbit/phporbit` to update
+that application's framework dependency.
 
 Create a blank application in a new folder:
 

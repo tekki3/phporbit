@@ -51,6 +51,14 @@ composer global config bin-dir --absolute
 export PATH="$(composer global config bin-dir --absolute):$PATH"
 [[/bash]]
 
+<p>To update the globally installed CLI later, run:</p>
+
+[[bash]]
+composer global update phporbit/phporbit
+[[/bash]]
+
+<p>This updates the CLI within the version constraint Composer has stored for the global installation. It does not update applications you have already created; run <code>composer update phporbit/phporbit</code> inside an existing application to update that application's framework dependency.</p>
+
 <p>In the folder where you keep your projects, run:</p>
 
 [[bash]]
