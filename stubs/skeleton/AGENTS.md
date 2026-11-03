@@ -94,6 +94,16 @@ registration next to it is safe — one `Connection`, shared by every request in
 the process either way. Do not call it a second time, and do not add a second
 static anywhere else on `Model`'s account.
 
+## Caching
+
+Inject `PhpOrbit\Cache\Cache`; use `remember($key, fn () => $value, 300)`,
+`get`, `set`, `has`, `delete` and `clear`. Values are JSON-compatible scalars,
+null and nested arrays, never objects. `CACHE_DRIVER=file` (also `storage`),
+`redis` or `memcached` selects the backend. `CacheFailed` is explicit, never a
+silent miss. Prefix private-data keys with the user or tenant id: the cache
+is intentionally shared across requests. `orbit cache:clear` clears application
+data; `orbit storage:clear` still clears templates only.
+
 ## Mail
 
 `Message::to(...)->subject(...)->text(...)`, sent through the injected `Mailer`.

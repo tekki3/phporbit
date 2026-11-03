@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caching — phporbit</title>
+<meta name="description" content="One injectable cache API for file storage, Redis and Memcached.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<div class="shell">
+<aside class="sidebar">
+    <a class="brand" href="index.html">
+        <picture>
+            <source srcset="assets/logo-on-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="assets/logo-on-light.svg" alt="phporbit" width="112" height="32">
+        </picture>
+    </a>
+    <p class="tagline">Developer documentation</p>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li><li><a href="models.html">Models</a></li><li><a href="caching.html" class="current" aria-current="page">Caching</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+</aside>
+
+<main id="content">
+    <article>
+        <h1>Caching</h1>
+        <p class="summary">One injectable cache API for file storage, Redis and Memcached.</p>
+        <p>Inject <code>PhpOrbit\Cache\Cache</code> into a controller or service. The demo and blank project bootstraps already register it. The default stores data in <code>storage/cache/data</code>, outside the document root; no server or extra PHP extension is needed.</p>
+
+<h2>Start with remember()</h2>
+
+<p><code>remember()</code> returns the cached value, or runs your callback and stores its result on a miss. Its TTL is in seconds.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">namespace</span> <span class="tk-class">App\Controllers</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Cache\Cache</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Database\Connection</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\Response</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Http\ServerRequest</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Routing\Handler</span><span class="tk-p">;</span>
+
+<span class="tk-keyword">final</span> <span class="tk-keyword">class</span> <span class="tk-class">TotalsController</span> <span class="tk-keyword">implements</span> <span class="tk-class">Handler</span>
+<span class="tk-p">{</span>
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">__construct</span><span class="tk-p">(</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Cache</span> <span class="tk-var">$cache</span><span class="tk-p">,</span>
+        <span class="tk-keyword">private</span> <span class="tk-keyword">readonly</span> <span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-p">}</span>
+
+    <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">handle</span><span class="tk-p">(</span><span class="tk-class">ServerRequest</span> <span class="tk-var">$request</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Response</span>
+    <span class="tk-p">{</span>
+        <span class="tk-var">$count</span> <span class="tk-p">=</span> <span class="tk-var">$this</span>-&gt;cache-&gt;<span class="tk-fn">remember</span><span class="tk-p">(</span>
+            <span class="tk-string">&#039;notes:count&#039;</span><span class="tk-p">,</span>
+            <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">int</span> =&gt; <span class="tk-var">$this</span>-&gt;database-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;notes&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">count</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+            ttlSeconds<span class="tk-p">:</span> <span class="tk-num">60</span><span class="tk-p">,</span>
+        <span class="tk-p">)</span><span class="tk-p">;</span>
+
+        <span class="tk-keyword">return</span> <span class="tk-class">Response</span>::<span class="tk-fn">json</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;count&#039;</span> =&gt; <span class="tk-var">$count</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-p">}</span>
+<span class="tk-p">}</span></code></pre></figure>
+
+<p>This example caches a shared total. For private data, include the authenticated user or tenant id in the key and check authorization before reading the cache. A cache entry is shared deliberately, across requests and users; it is not request-local storage.</p>
+
+<h2>The API</h2>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$cache</span>-&gt;<span class="tk-fn">set</span><span class="tk-p">(</span><span class="tk-string">&#039;price:42&#039;</span><span class="tk-p">,</span> <span class="tk-p">[</span><span class="tk-string">&#039;amount&#039;</span> =&gt; <span class="tk-num">19.95</span><span class="tk-p">,</span> <span class="tk-string">&#039;currency&#039;</span> =&gt; <span class="tk-string">&#039;EUR&#039;</span><span class="tk-p">]</span><span class="tk-p">,</span> <span class="tk-num">300</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$price</span> <span class="tk-p">=</span> <span class="tk-var">$cache</span>-&gt;<span class="tk-fn">get</span><span class="tk-p">(</span><span class="tk-string">&#039;price:42&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>      <span class="tk-comment">// The array above, or null on a miss.</span>
+<span class="tk-var">$exists</span> <span class="tk-p">=</span> <span class="tk-var">$cache</span>-&gt;<span class="tk-fn">has</span><span class="tk-p">(</span><span class="tk-string">&#039;price:42&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>     <span class="tk-comment">// true, even for cached null or false.</span>
+<span class="tk-var">$cache</span>-&gt;<span class="tk-fn">delete</span><span class="tk-p">(</span><span class="tk-string">&#039;price:42&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>           <span class="tk-comment">// Deleting an absent entry is safe.</span>
+
+<span class="tk-var">$cache</span>-&gt;<span class="tk-fn">set</span><span class="tk-p">(</span><span class="tk-string">&#039;feature:enabled&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">false</span><span class="tk-p">)</span><span class="tk-p">;</span> <span class="tk-comment">// Uses CACHE_TTL (300 seconds by default).</span>
+<span class="tk-var">$cache</span>-&gt;<span class="tk-fn">set</span><span class="tk-p">(</span><span class="tk-string">&#039;reference:version&#039;</span><span class="tk-p">,</span> <span class="tk-num">7</span><span class="tk-p">,</span> <span class="tk-num">0</span><span class="tk-p">)</span><span class="tk-p">;</span> <span class="tk-comment">// 0 means no expiration.</span>
+<span class="tk-var">$cache</span>-&gt;<span class="tk-fn">set</span><span class="tk-p">(</span><span class="tk-string">&#039;nullable&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">null</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$cache</span>-&gt;<span class="tk-fn">remember</span><span class="tk-p">(</span><span class="tk-string">&#039;nullable&#039;</span><span class="tk-p">,</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">string</span> =&gt; <span class="tk-string">&#039;not called&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+
+<span class="tk-var">$cache</span>-&gt;<span class="tk-fn">clear</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                      <span class="tk-comment">// Only this application&#039;s namespace.</span></code></pre></figure>
+
+<ul>
+<li>Values may be strings, integers, finite floats, booleans, null, or nested arrays of those values. Empty arrays and scalar types survive a round trip.</li>
+<li>Objects (including models and <code>JsonSerializable</code>), resources, recursive arrays, invalid UTF-8 and non-finite numbers are refused. Convert a model into an array of data first. Nothing uses PHP <code>serialize()</code> or <code>unserialize()</code>.</li>
+<li><code>get()</code> returns null for a miss <em>and</em> a cached null. <code>has()</code> distinguishes them; <code>remember()</code> treats null as a hit. It does not confuse false, zero or an empty string with a miss.</li>
+<li>Keys contain 1 to 1024 bytes and are hashed before reaching a backend, so punctuation cannot create a path or a Memcached protocol command.</li>
+<li>Omitting the TTL uses <code>CACHE_TTL</code>; zero never expires. Negative TTLs and expiration beyond the portable signed Unix timestamp limit (2038) are refused. Expiration is checked on reads, not dependent on a scheduler.</li>
+</ul>
+
+<p>The returned value is a JSON-data union, not an inferred model or array shape. Narrow with <code>is_array()</code>, <code>is_string()</code>, etc. before using it as a particular type. Nested array elements are a JSON boundary, validated recursively on writes.</p>
+
+<h2>Choose a backend</h2>
+
+<p>Change the environment and restart long-lived workers. The API and controller code stay the same.</p>
+
+<h3>File storage (default)</h3>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-var">CACHE_DRIVER</span><span class="tk-p">=</span><span class="tk-string">file</span>
+<span class="tk-var">CACHE_TTL</span><span class="tk-p">=</span><span class="tk-string">300</span>
+<span class="tk-var">CACHE_PATH</span><span class="tk-p">=</span><span class="tk-string">storage/cache/data</span></code></pre></figure>
+
+<p><code>CACHE_DRIVER=storage</code> is an alias for <code>file</code>. Relative paths resolve against the project root, not the current working directory. Files are written atomically with mode 0600; newly created directories use 0700. Use a private, trusted directory outside <code>public/</code>, dedicated to caching. File cache entries are local to that filesystem, not shared across separate servers. Expired entries are misses; their files remain until overwritten or cleared, avoiding deletion races with concurrent writers.</p>
+
+<h3>Redis</h3>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-var">CACHE_DRIVER</span><span class="tk-p">=</span><span class="tk-string">redis</span>
+<span class="tk-var">CACHE_HOST</span><span class="tk-p">=</span><span class="tk-string">127.0.0.1</span>
+<span class="tk-var">CACHE_PORT</span><span class="tk-p">=</span><span class="tk-string">6379</span>
+<span class="tk-var">CACHE_DATABASE</span><span class="tk-p">=</span><span class="tk-string">0</span>
+<span class="tk-var">CACHE_TIMEOUT</span><span class="tk-p">=</span><span class="tk-string">2</span>
+<span class="tk-var">CACHE_PREFIX</span><span class="tk-p">=</span><span class="tk-string">my-app-production</span>
+<span class="tk-comment"># CACHE_USERNAME=app</span>
+<span class="tk-comment"># CACHE_PASSWORD=...</span></code></pre></figure>
+
+<p>Install <code>ext-redis</code> and run a Redis server. <code>CACHE_USERNAME</code> is optional for ACL authentication; a password without a username uses Redis password authentication. <code>CACHE_DATABASE</code> selects a non-negative database index. A username without a password is an error. For a TLS-enabled Redis endpoint use <code>CACHE_HOST=tls://cache.example.test</code>; PHP's TLS verification remains enabled.</p>
+
+<h3>Memcached</h3>
+
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-var">CACHE_DRIVER</span><span class="tk-p">=</span><span class="tk-string">memcached</span>
+<span class="tk-var">CACHE_HOST</span><span class="tk-p">=</span><span class="tk-string">127.0.0.1</span>
+<span class="tk-var">CACHE_PORT</span><span class="tk-p">=</span><span class="tk-string">11211</span>
+<span class="tk-var">CACHE_TIMEOUT</span><span class="tk-p">=</span><span class="tk-string">2</span>
+<span class="tk-var">CACHE_PREFIX</span><span class="tk-p">=</span><span class="tk-string">my-app-production</span></code></pre></figure>
+
+<p>Install <code>ext-memcached</code> and run a Memcached server. The adapter handles Memcached's special interpretation of TTLs longer than 30 days. This adapter does not implement SASL or TLS: use a local server or a trusted private network, never a public endpoint.</p>
+
+<h3>Namespaces and clearing</h3>
+
+<p><code>CACHE_PREFIX</code> defaults to a hash of the project root, isolating local projects automatically. Set an explicit, unique prefix for each application and environment in production. All instances sharing a cache must use the same prefix; an application whose deployment path changes should also set a stable prefix. Do not share a prefix between applications or environments.</p>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code>./orbit cache:clear</code></pre></figure>
+
+<p>This reads the cache configuration without booting the application or connecting to its database. It clears data only for the configured backend and namespace. <code>./orbit storage:clear</code> still clears compiled templates only; it does not touch application data. The admin Storage page likewise manages templates, not this cache.</p>
+
+<p>Redis clearing scans and deletes namespaced keys rather than using <code>FLUSHDB</code>. Memcached has no safe namespaced enumeration, so clearing replaces a shared random generation token instead of using a server-wide flush. Existing values from the old generation become unreachable and remain on the server until expiration or eviction (including indefinitely until eviction for TTL 0). Generation tokens are read from the server on each operation, so other workers see a clear immediately. Token eviction also causes safe misses, never resurrection of a previous generation.</p>
+
+<h2>Failures and concurrency</h2>
+
+<p>Backend connection failures, failed writes and corrupt cache data throw <code>PhpOrbit\Cache\CacheFailed</code>. Invalid keys, values or TTLs throw <code>InvalidArgumentException</code>; invalid environment settings name the configuration key. There is no silent fallback to another driver and no success-shaped response when a backend is unavailable. Catch <code>CacheFailed</code> at an application boundary if your application deliberately chooses to log the failure and run without caching.</p>
+
+<p><code>remember()</code> is cache-aside, not a distributed lock: simultaneous misses may run the callback more than once. Callback exceptions propagate and are not cached. Concurrent writes are last-write-wins; clearing is not a transaction with concurrent writers. Do not rely on caches for uniqueness, authorization, a durable queue, or correctness-critical locking. Entries can be evicted early by the server.</p>
+
+<p>The cache service retains no decoded values, callbacks or request objects in memory. Every read reaches the store, so external updates and clears are visible in long-lived workers. File writes use rename, letting readers see a complete old or new value. The same API works under both worker and per-request SAPIs.</p>
+
+<h2>Existing applications and tests</h2>
+
+<p>Already-created projects can add the binding below inside their boot callback. New blank and demo projects include it automatically. Configuration and remote connections are resolved lazily on the first use of <code>Cache</code>.</p>
+
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Cache\Cache</span><span class="tk-p">;</span>
+<span class="tk-keyword">use</span> <span class="tk-class">PhpOrbit\Cache\CacheFactory</span><span class="tk-p">;</span>
+
+<span class="tk-var">$app</span>-&gt;container-&gt;<span class="tk-fn">singleton</span><span class="tk-p">(</span>
+    <span class="tk-class">Cache</span>::<span class="tk-keyword">class</span><span class="tk-p">,</span>
+    <span class="tk-keyword">static</span> <span class="tk-keyword">fn</span> <span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-class">Cache</span> =&gt; <span class="tk-class">CacheFactory</span>::<span class="tk-fn">fromEnvironment</span><span class="tk-p">(</span><span class="tk-var">$env</span><span class="tk-p">,</span> <span class="tk-var">$root</span><span class="tk-p">)</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+
+<p>For offline tests, construct <code>new Cache(new FileCacheStore($temporaryDirectory, 'test'))</code> and clear/remove the temporary directory in teardown. Live integration tests use <code>REDIS_HOST</code>/<code>REDIS_PORT</code> and <code>MEMCACHED_HOST</code>/<code>MEMCACHED_PORT</code>, with their corresponding PHP extensions. Redis authentication can be supplied through <code>REDIS_USERNAME</code>/<code>REDIS_PASSWORD</code>.</p>
+    </article>
+    <nav class="pager"><a href="models.html"><span>Previous</span>Models</a><a class="next" href="security.html"><span>Next</span>Security</a></nav>
+    <footer class="site-footer">
+        <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
+    </footer>
+</main>
+</div>
+</body>
+</html>

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PhpOrbit\Tests\Unit\Console;
 
+use PhpOrbit\Cache\Cache;
+use PhpOrbit\Cache\CacheFactory;
+use PhpOrbit\Config\Environment;
 use PhpOrbit\Console\Scaffold;
 use PhpOrbit\Console\Variant;
 use PhpOrbit\Database\Connection;
@@ -293,6 +296,11 @@ final class ScaffoldTest extends TestCase
 
             self::assertSame(Status::NotFound, $application->handle($this->get('/nope'))->status);
 
+            $cache = $application->container()->get(Cache::class);
+            self::assertSame('cached', $cache->remember('scaffold-test', static fn (): string => 'cached'));
+            self::assertSame('cached', $cache->get('scaffold-test'));
+            $cache->clear();
+
             // The stylesheet is served by the static middleware the stub wires up.
             self::assertSame(Status::Ok, $application->handle($this->get('/assets/app.css'))->status);
 
@@ -303,6 +311,35 @@ final class ScaffoldTest extends TestCase
 
             $previousLevel === false ? putenv('LOG_LEVEL') : putenv('LOG_LEVEL=' . $previousLevel);
         }
+    }
+
+    #[DataProvider('seedProjects')]
+    public function test_cache_clear_works_without_booting_a_database_through_both_clis(Variant $variant, bool $checkoutCli): void
+    {
+        $target = $this->workspace . '/cache-app';
+        $this->scaffold()->create($target, $variant);
+
+        if ($checkoutCli) {
+            copy(dirname(__DIR__, 3) . '/orbit', $target . '/orbit');
+        }
+
+        mkdir($target . '/vendor');
+        file_put_contents($target . '/vendor/autoload.php', sprintf(
+            '<?php return require %s;',
+            var_export(dirname(__DIR__, 3) . '/vendor/autoload.php', true),
+        ));
+        file_put_contents($target . '/.env', "CACHE_DRIVER=file\nCACHE_PATH=storage/cache/custom\nCACHE_PREFIX=cli-test\nDB_DRIVER=invalid\n");
+        $cache = CacheFactory::fromEnvironment(Environment::load($target . '/.env'), $target);
+        $cache->set('key', 'cached');
+        file_put_contents($target . '/storage/cache/views/keep.php', 'template');
+
+        self::assertStringContainsString('orbit cache:clear', $this->runCli($target, 'help'));
+        self::assertStringContainsString('Application cache cleared.', $this->runCli($target, 'cache:clear'));
+        self::assertFalse($cache->has('key'));
+        self::assertFileExists($target . '/storage/cache/views/keep.php');
+
+        file_put_contents($target . '/.env', "CACHE_DRIVER=typo\n");
+        self::assertStringContainsString('CACHE_DRIVER', $this->runCli($target, 'cache:clear', 1));
     }
 
     #[DataProvider('seedProjects')]

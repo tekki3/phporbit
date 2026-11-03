@@ -33,6 +33,7 @@ Usage:
   orbit mail:list [--status=sent|failed|pending] [--limit=20]
   orbit mail:send-pending [--limit=50]
   orbit mail:resend <id>|--failed [--limit=50]
+  orbit cache:clear
   orbit storage:clear
   orbit sessions:gc
   orbit help
@@ -694,6 +695,15 @@ Mail #3 has status "sent"; only failed mail can be resent.
 <p>Takes an id, or <code>--failed</code> to resend everything currently failed (bounded by <code>--limit</code>, default 50). Only <code>failed</code> mail can be resent — a message already marked <code>sent</code> is refused, because resending it would deliver it twice with no record that either send happened. A resend that fails again updates the same row rather than adding a new one; <code>attempts</code> grows and the error moves to the latest attempt.</p>
 
 <p><code>--failed</code> does not stop at the first failure: it works through every entry and reports how many were resent successfully and how many are still failing, exiting non-zero only if at least one remains failed — the shape a cron entry or a deploy step would check.</p>
+
+<h2>cache:clear</h2>
+
+<p>Clears application data in the configured <a href="caching.html">file, Redis or Memcached cache</a>, only within this application's <code>CACHE_PREFIX</code>. Reads <code>.env</code> without booting the application or connecting to its database. It never flushes the entire Redis or Memcached server, and it does not remove compiled templates.</p>
+
+[[bash]]
+$ orbit cache:clear
+Application cache cleared.
+[[/bash]]
 
 <h2>storage:clear</h2>
 

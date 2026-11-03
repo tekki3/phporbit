@@ -27,6 +27,8 @@ use PhpOrbit\Auth\Authenticator;
 use PhpOrbit\Auth\LoginThrottle;
 use PhpOrbit\Auth\PasswordHasher;
 use PhpOrbit\Auth\UserProvider;
+use PhpOrbit\Cache\Cache;
+use PhpOrbit\Cache\CacheFactory;
 use PhpOrbit\Config\Environment;
 use PhpOrbit\Container\RequestScope;
 use PhpOrbit\Crypto\CryptoFactory;
@@ -134,6 +136,10 @@ return Application::boot(
         );
 
         $app->container->singleton(Environment::class, static fn (): Environment => $env);
+        $app->container->singleton(
+            Cache::class,
+            static fn (): Cache => CacheFactory::fromEnvironment($env, $root),
+        );
         $app->container->singleton(Mailer::class, static fn (): Mailer => $mailer);
         // Also bound under its concrete type, the same way DatabaseUserProvider
         // is below — orbit mail:resend needs resend(), which Mailer does not

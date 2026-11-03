@@ -20,7 +20,7 @@
         </picture>
     </a>
     <p class="tagline">Developer documentation</p>
-    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li><li><a href="models.html">Models</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html" class="current" aria-current="page">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li><li><a href="models.html">Models</a></li><li><a href="caching.html">Caching</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html" class="current" aria-current="page">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
 </aside>
 
 <main id="content">
@@ -52,6 +52,7 @@ Usage:
   orbit mail:list [--status=sent|failed|pending] [--limit=20]
   orbit mail:send-pending [--limit=50]
   orbit mail:resend &lt;id&gt;|--failed [--limit=50]
+  orbit cache:clear
   orbit storage:clear
   orbit sessions:gc
   orbit help</code></pre></figure>
@@ -640,6 +641,13 @@ Mail #3 has status &quot;sent&quot;; only failed mail can be resent.</code></pre
 <p>Takes an id, or <code>--failed</code> to resend everything currently failed (bounded by <code>--limit</code>, default 50). Only <code>failed</code> mail can be resent — a message already marked <code>sent</code> is refused, because resending it would deliver it twice with no record that either send happened. A resend that fails again updates the same row rather than adding a new one; <code>attempts</code> grows and the error moves to the latest attempt.</p>
 
 <p><code>--failed</code> does not stop at the first failure: it works through every entry and reports how many were resent successfully and how many are still failing, exiting non-zero only if at least one remains failed — the shape a cron entry or a deploy step would check.</p>
+
+<h2>cache:clear</h2>
+
+<p>Clears application data in the configured <a href="caching.html">file, Redis or Memcached cache</a>, only within this application's <code>CACHE_PREFIX</code>. Reads <code>.env</code> without booting the application or connecting to its database. It never flushes the entire Redis or Memcached server, and it does not remove compiled templates.</p>
+
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>orbit cache:clear
+Application cache cleared.</code></pre></figure>
 
 <h2>storage:clear</h2>
 

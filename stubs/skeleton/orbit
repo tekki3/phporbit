@@ -12,6 +12,8 @@ declare(strict_types=1);
  */
 
 use PhpOrbit\Admin\AdminApplication;
+use PhpOrbit\Cache\CacheFactory;
+use PhpOrbit\Cache\CacheFailed;
 use PhpOrbit\Config\Environment;
 use PhpOrbit\Config\InvalidEnvFile;
 use PhpOrbit\Config\MissingConfiguration;
@@ -128,6 +130,8 @@ Commands:
       Deliver queued messages up to the requested limit.
   orbit mail:resend <id>|--failed [--limit=50]
       Retry one failed message by id, or retry failed messages up to the limit.
+  orbit cache:clear
+      Clear application data in the configured cache backend and namespace.
   orbit storage:clear
       Remove compiled templates; they are rebuilt automatically when needed.
   orbit sessions:gc
@@ -764,6 +768,11 @@ try {
         );
         exit(0);
 
+    case 'cache:clear':
+        CacheFactory::fromEnvironment(Environment::load($root . '/.env'), $root)->clear();
+        echo 'Application cache cleared.' . PHP_EOL;
+        exit(0);
+
     case 'storage:clear':
         // No reason to boot the application: the cache directory is a fixed
         // convention (storage/cache/views), not something configuration
@@ -816,6 +825,9 @@ try {
         fwrite(STDERR, sprintf('Unknown command "%s".', $command) . PHP_EOL . PHP_EOL . $usage);
         exit(1);
     }
+} catch (CacheFailed $e) {
+    fwrite(STDERR, 'Cache error: ' . $e->getMessage() . PHP_EOL);
+    exit(1);
 } catch (InvalidEnvFile | MissingConfiguration | ConnectionFailed $e) {
     fwrite(STDERR, 'Configuration error: ' . $e->getMessage() . PHP_EOL);
     exit(1);

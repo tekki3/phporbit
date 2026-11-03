@@ -20,6 +20,9 @@ LOG_LEVEL=info
 
 DB_DATABASE=storage/app.sqlite
 
+CACHE_DRIVER=file
+CACHE_TTL=300
+
 SESSION_LIFETIME=7200
 SESSION_COOKIE=orbit_session
 
@@ -37,6 +40,8 @@ TRUSTED_PROXIES=
 </div>
 
 <h2>Reading settings</h2>
+
+<p><a href="caching.html">Application caching</a> supports file storage, Redis and Memcached through <code>CACHE_DRIVER</code>. File storage is the default, with no external service required.</p>
 
 <p>There is no <code>get(): mixed</code>. Everything in a <code>.env</code> is a string, and the conversion has to happen somewhere; doing it here means a bad value fails at boot with a readable message instead of behaving strangely later.</p>
 

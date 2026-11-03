@@ -15,6 +15,8 @@ declare(strict_types=1);
  * the route table is compiled and the container frozen — permanently.
  */
 
+use PhpOrbit\Cache\Cache;
+use PhpOrbit\Cache\CacheFactory;
 use PhpOrbit\Config\Environment;
 use PhpOrbit\Crypto\CryptoFactory;
 use PhpOrbit\Crypto\Encrypter;
@@ -107,6 +109,10 @@ return Application::boot(
         );
 
         $app->container->singleton(Environment::class, static fn (): Environment => $env);
+        $app->container->singleton(
+            Cache::class,
+            static fn (): Cache => CacheFactory::fromEnvironment($env, $root),
+        );
         $app->container->singleton(Mailer::class, static fn (): Mailer => $mailer);
         // Also bound under its concrete type: orbit mail:resend needs resend(),
         // which Mailer does not declare.

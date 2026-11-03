@@ -58,6 +58,25 @@ Keep file-level code free of side effects and use seeders for data, not schema
 changes. There is no seeding ledger or automatic run when the application boots.
 An empty or absent seed directory prints `Nothing to seed.`.
 
+## Caching
+
+Inject `PhpOrbit\Cache\Cache` into a controller or service. Use
+`$cache->remember('key', fn (): array => ['result' => 'value'], 300)` to compute
+on a miss; `get`, `set`, `has`, `delete` and `clear` are also available.
+Values are JSON-compatible scalars, null and nested arrays, not PHP objects.
+Include the user or tenant id in keys for private data.
+
+`CACHE_DRIVER=file` (also `storage`) is the default and uses
+`storage/cache/data`. Select `redis` or `memcached` and install the matching
+PHP extension for a remote cache. Set `CACHE_HOST`, `CACHE_PORT` and a unique
+`CACHE_PREFIX`; use a stable prefix across all instances of one application.
+Restart workers after changing configuration.
+
+TTLs are seconds; omitted uses `CACHE_TTL=300`, and zero never expires.
+Backend failures throw `PhpOrbit\Cache\CacheFailed`, never silently fall back.
+`php orbit cache:clear` clears this application's configured cache namespace;
+`php orbit storage:clear` still clears compiled templates only.
+
 ## Your first page
 
 A **route** maps a URL to a **controller** (the PHP class handling the request).
@@ -116,6 +135,7 @@ php orbit make:class Notes/Repo      # a plain App\ class (--singleton, --scoped
 php orbit make:controller Reports    # a controller (--view adds a template)
 php orbit migrate:status             # applied and pending migrations
 php orbit migrate:rollback           # reverse the most recent batch
+php orbit cache:clear                # clear configured application data cache
 
 composer test                       # PHPUnit
 composer stan                       # PHPStan at max level
@@ -131,7 +151,7 @@ composer stan                       # PHPStan at max level
 | `app/templates/` | `*.orbit.php` templates |
 | `database/migrations/` | Schema changes |
 | `public/` | Document root: front controller and assets |
-| `storage/` | Sessions, compiled templates, SQLite file (git-ignored) |
+| `storage/` | Sessions, application cache, compiled templates, SQLite file (git-ignored) |
 
 ## The one thing to know
 

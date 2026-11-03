@@ -40,6 +40,10 @@
     "bin": [
         "orbit"
     ],
+    "suggest": {
+        "ext-memcached": "Required for CACHE_DRIVER=memcached.",
+        "ext-redis": "Required for CACHE_DRIVER=redis."
+    },
     "scripts": {
         "test": "phpunit",
         "test:integration": "phpunit --testsuite integration",

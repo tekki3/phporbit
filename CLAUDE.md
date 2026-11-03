@@ -40,6 +40,7 @@ cp .env.example .env                 # first run: configuration
 ./orbit migrate:status              # applied/pending, with batch numbers
 ./orbit migrate:rollback [--batches=1]
 ./orbit storage:clear               # wipe storage/cache/views (safe: recompiles on next render)
+./orbit cache:clear                 # clear application data in the configured cache namespace
 ./orbit sessions:gc                 # delete expired session files
 ./orbit mail:test --to=x@example.test       # sends one real message via MAIL_DRIVER
 ./orbit mail:list [--status=failed]         # every send is logged to mail_log
@@ -181,6 +182,37 @@ Quoting is per connection rather than by setting MySQL's `sql_mode` to `ANSI_QUO
 Migrations targeting MySQL need `VARCHAR(n)` rather than `TEXT` on indexed columns (MySQL cannot index `TEXT` without a prefix length), and cannot rely on transactional DDL.
 
 **Only `pdo_sqlite` is installed on this machine.** The per-engine SQL and DSN generation is unit-tested by labelling a connection with a driver and inspecting `toSql()` without executing it; connecting to a real MySQL or PostgreSQL server has not been exercised here.
+
+## Caching
+
+`Cache\Cache` is constructor-injected and bound lazily as a singleton in both
+bootstraps. `CACHE_DRIVER=file` (alias `storage`) defaults to
+`storage/cache/data`; `redis` and `memcached` use their optional native PHP
+extensions. `CACHE_TTL` defaults to 300 seconds; zero never expires.
+`get`, `set`, `has`, `remember`, `delete` and `clear` use the same API on all
+drivers. Missing entries return null, but cached null is a hit for `has` and
+`remember`. Backend errors throw `CacheFailed`, never silently fall back.
+
+JSON cache values are a deliberate narrowing boundary, like template data:
+the public native union is scalar/array/null; nested array elements require
+`mixed` in PHPDoc because PHPStan cannot express recursive JSON types.
+Writes recursively reject objects, resources and cycles before JSON encoding.
+No PHP object serialization. No decoded values or request callbacks are kept
+on the singleton; reads always consult the backend. Private data needs a user-
+or tenant-specific key and an authorization check before cache access.
+
+`CACHE_PREFIX` defaults to a hash of the project root. Set a stable unique
+prefix across deployed instances of one application. Clearing must never call
+Redis FLUSHDB or Memcached flush: Redis scans its own prefix; Memcached rotates
+a server-stored random generation token (read on every operation). Old
+Memcached generations expire or are evicted, and expired file entries are
+reclaimed on overwrite or clear rather than racing a fresh write on read.
+`cache:clear` reads configuration without booting a database; `storage:clear`
+and the admin Storage page continue to manage compiled templates only.
+
+See `docs/pages/29-caching.php`, `tests/Unit/Cache`, `tests/Worker/CacheTest.php`
+and `tests/Integration/CacheTest.php`. Live cache tests use REDIS_HOST/PORT and
+MEMCACHED_HOST/PORT and require ext-redis/ext-memcached respectively.
 
 ## Forms
 
