@@ -125,6 +125,7 @@ Run these from your project folder, in a second terminal while the server runs:
 php orbit routes
 php orbit make:controller Blog/Posts --view
 php orbit make:form Contact --controllers
+php orbit make:auth
 php orbit make:migration create_posts_table
 php orbit migrate
 php orbit migrate:status
@@ -134,6 +135,13 @@ php orbit help
 `routes` lists registered URLs, `make:*` generates starter files, and
 `migrate:status` shows applied and pending database changes. Generated files
 are yours to edit; read each command's output for wiring you need to add.
+
+In a blank project, `make:auth` adds login, email-verified registration,
+MFA/recovery codes, profiles and administrator user management. Configure
+SMTP and `APP_URL`, migrate, and register at `/register`. After verifying
+your email, `php orbit auth:admin you@example.com` appoints the first admin.
+See [authentication scaffolding](docs/advanced-auth.html) for setup; it never
+overwrites files or replaces existing demo authentication.
 
 `php orbit ui` opens a separate admin dashboard at <http://127.0.0.1:8081>
 for generators, migrations, mail and storage. **It has no login: keep the

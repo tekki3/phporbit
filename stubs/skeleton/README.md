@@ -128,6 +128,32 @@ does not include a `/docs` route.
 
 ## Commands
 
+### Optional authentication
+
+In a blank project, run `php orbit make:auth` to generate login, registration
+with mandatory email verification, MFA/recovery codes, profile pages and
+administrator user management. Existing files are never overwritten.
+
+Configure `APP_URL` and SMTP (`MAIL_DRIVER=smtp`) in `.env`, run
+`php orbit migrate`, restart the server and visit `/register`. After verifying
+your email, appoint yourself from a trusted terminal:
+
+```bash
+php orbit auth:admin you@example.com
+```
+
+Sign in again, then visit `/account`, `/account/security` and, as an
+administrator, `/account/users`. Members cannot grant themselves privileges.
+All primary sign-in methods still require MFA when enabled. Google/Entra
+remain optional. Registration/reset/login emails bypass the readable mail log.
+
+New blank projects load `app/auth.php` automatically. Older projects need the
+boot callback line printed by the generator. Demo projects already have
+authentication and cannot be overlaid. Edit the generated files in
+`app/src/AuthKit/` and `app/templates/auth-kit/` directly; run the generated
+tests with `composer test`. See the framework's
+`vendor/phporbit/phporbit/docs/advanced-auth.html` for configuration and limits.
+
 ```bash
 php orbit serve --port=9000 --debug  # local error details and template recompilation
 php orbit routes                    # print the compiled route table

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PhpOrbit\Admin;
 
 use Closure;
+use PhpOrbit\Admin\Controllers\Generate\AuthPageController;
+use PhpOrbit\Admin\Controllers\Generate\AuthSubmitController;
 use PhpOrbit\Admin\Controllers\ClearStorageController;
 use PhpOrbit\Admin\Controllers\GcSessionsController;
 use PhpOrbit\Admin\Controllers\Generate\ClassPageController;
@@ -174,6 +176,8 @@ final class AdminApplication
 
                 $routes->get('/generate', GenerateIndexController::class, 'admin.generate');
                 $routes->get('/generate/class', ClassPageController::class, 'admin.generate.class');
+                $routes->get('/generate/auth', AuthPageController::class, 'admin.generate.auth');
+                $routes->post('/generate/auth', AuthSubmitController::class, 'admin.generate.auth.submit');
                 $routes->post('/generate/class', ClassSubmitController::class, 'admin.generate.class.submit');
                 $routes->get('/generate/controller', ControllerPageController::class, 'admin.generate.controller');
                 $routes->post('/generate/controller', ControllerSubmitController::class, 'admin.generate.controller.submit');

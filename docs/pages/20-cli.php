@@ -14,6 +14,8 @@ phporbit
 Usage:
   orbit new <directory> [--demo] [--force]
   orbit key:generate
+  orbit make:auth
+  orbit auth:admin <email>
   orbit make:class <Name> [--singleton|--scoped] [--force]
   orbit make:controller <Name> [--view] [--force]
   orbit make:form <Name> [--fields=a:text,b:email] [--captcha]
@@ -93,6 +95,22 @@ $ composer install
 $ ./orbit migrate       # --demo also wants: ./orbit db:seed
 $ ./orbit serve
 [[/bash]]
+
+<h2>make:auth</h2>
+
+<p>Generates an editable authentication module for a blank project: login/logout, registration with mandatory email verification, optional TOTP and recovery codes, password reset, magic links, profile editing and administrator-only user management. Google and Entra account linking are included and remain disabled until configured.</p>
+[[bash]]
+php orbit make:auth
+# Configure APP_URL and SMTP in .env.
+php orbit migrate
+php orbit serve
+# Visit /register, verify the email, then:
+php orbit auth:admin your@email.example
+[[/bash]]
+<p>New blank projects load the generated <code>app/auth.php</code> automatically. Older projects get the boot registration line to add by hand. The generator does not rewrite your bootstrap, routes, layout, configuration or existing files, and has no <code>--force</code> option. Existing demo authentication is refused rather than overlaid. See <a href="advanced-auth.html">authentication scaffolding</a> for the files, routes, setup requirements and integration constraints.</p>
+
+<h2>auth:admin</h2>
+<p>Grants administrator access to an existing, verified, unblocked account in the generated <code>auth_users</code> table. Run locally as the site operator; no first-user-wins rule, default administrator password or public elevation endpoint exists. Promotion revokes existing sessions; sign in again afterwards.</p>
 
 <h2>make:class</h2>
 

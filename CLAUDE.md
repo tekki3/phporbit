@@ -351,6 +351,20 @@ Convention over configuration, minimum ceremony between install and a route retu
 
 ## Code generation (`orbit make:*`)
 
+`Console\AuthMaker` assembles an editable auth module from `stubs/auth/` plus
+the demo's existing MFA/email/OIDC flows, adapted into `App\AuthKit`. It
+preflights all paths, refuses symlinks/collisions and has no overwrite flag.
+The blank bootstrap's optional `app/auth.php` hook makes it automatic without
+rewriting a developer-owned bootstrap. Existing demo authentication is refused.
+Registration creates pending rows and sends direct, non-audited verification
+mail; only a one-use confirmation POST creates an active account. Every member
+starts without admin privileges. `orbit auth:admin <verified-email>` is the
+local operator's explicit bootstrap, never a public first-user-wins rule.
+Generated administration serializes changes with the `auth_management` row,
+rechecks the actor, requires password/MFA confirmation and revokes sessions.
+Keep generated-code round trips and max-level PHPStan clean, not merely the
+generator itself; stubs remain outside the repository's normal analysis paths.
+
 `Console\MigrationMaker` writes a migration. The filename prefix is a **timestamp by default** — the migrator orders by filename, and timestamps are what let two branches add migrations without coordinating; `--sequential` gives the `0001` counter style instead. The name picks the starting contents (`create_x_table` → CREATE TABLE, `add_x_to_y` → ALTER, anything else → a blank pair), which is a convenience and never load-bearing. **Generated migrations use `$database->driver()->autoIncrementPrimaryKey()` and `textType()` where needed**, so they account for engine-specific identity and large-text types.
 
 Names are normalised freely (`CreateArticlesTable`, `create articles table`) because a name is words — but a path separator is refused rather than rewritten, since it means the caller was aiming somewhere. `--table` is validated as an identifier, because no driver can bind one.

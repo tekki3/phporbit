@@ -73,6 +73,19 @@ final class AdminGenerateAndToolsTest extends TestCase
 
     // --- class ------------------------------------------------------------
 
+    public function test_auth_generator_writes_the_module_and_refuses_regeneration(): void
+    {
+        file_put_contents($this->workspace . '/app/bootstrap.php', '<?php');
+        [$token, $cookies] = $this->csrfTokenAndCookies('/generate/auth');
+        $response = $this->admin->handle(Requests::form('/generate/auth', ['_token' => $token], $cookies));
+        self::assertSame(Status::Ok, $response->status);
+        self::assertFileExists($this->workspace . '/app/auth.php');
+        self::assertStringContainsString('auth:admin', $response->body);
+        $again = $this->admin->handle(Requests::form('/generate/auth', ['_token' => $token], $cookies));
+        self::assertSame(Status::UnprocessableEntity, $again->status);
+        self::assertStringContainsString('already generated', $again->body);
+    }
+
     public function test_generating_a_class_writes_the_file_and_shows_the_result(): void
     {
         [$token, $cookies] = $this->csrfTokenAndCookies('/generate/class');

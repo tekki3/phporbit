@@ -125,6 +125,15 @@ return Application::boot(
             static fn (): Migrator => new Migrator($database, $root . '/database/migrations'),
         );
 
+        // make:auth installs this optional boot module without rewriting this file.
+        if (is_file($root . '/app/auth.php')) {
+            $configureAuth = require $root . '/app/auth.php';
+            if (!$configureAuth instanceof Closure) {
+                throw new RuntimeException('app/auth.php must return a boot callback.');
+            }
+            $configureAuth($app, $env, $root);
+        }
+
         // Order matters. Logging is outermost so it times everything; static
         // files short-circuit before any session work; CSRF must follow the
         // session that holds its token.

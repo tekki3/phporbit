@@ -114,6 +114,11 @@ factory so resets and security changes invalidate old sessions. External
 identities never auto-link by email; Entra tenants are explicitly allowlisted.
 Authentication emails bypass the readable mail audit/queue and require SMTP.
 Blank projects do not install authentication routes or schemas automatically.
+`orbit make:auth` explicitly adds an editable `App\AuthKit` module with verified
+registration, MFA and admin user management. New blank bootstraps load its
+`app/auth.php` hook. Every account starts as a member; `orbit auth:admin <email>`
+promotes a verified account from the operator's terminal. Do not remove the
+password/MFA checks, administrator guard, lock row or session revocation.
 
 `Message::to(...)->subject(...)->text(...)`, sent through the injected `Mailer`.
 CR/LF in a subject, display name or address is refused — that is header

@@ -75,6 +75,7 @@
             </a>
             <div class="nav-sublist">
                 <a class="nav-sublink" href="/generate/class" @if($currentPath === '/generate/class') aria-current="page" @endif>Class</a>
+                <a class="nav-sublink" href="/generate/auth" @if($currentPath === '/generate/auth') aria-current="page" @endif>Authentication</a>
                 <a class="nav-sublink" href="/generate/controller" @if($currentPath === '/generate/controller') aria-current="page" @endif>Controller</a>
                 <a class="nav-sublink" href="/generate/form" @if($currentPath === '/generate/form') aria-current="page" @endif>Form</a>
                 <a class="nav-sublink" href="/generate/middleware" @if($currentPath === '/generate/middleware') aria-current="page" @endif>Middleware</a>

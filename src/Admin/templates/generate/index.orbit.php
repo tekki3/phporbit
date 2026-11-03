@@ -10,6 +10,11 @@
 </p>
 
 <div class="tiles">
+    <a class="tile" href="/generate/auth">
+        <span class="tile-label">Authentication</span>
+        <span class="tile-value tile-value-text">make:auth</span>
+        <span class="tile-note">Login, verified registration, MFA and administrator user management.</span>
+    </a>
     <a class="tile" href="/generate/class">
         <span class="tile-label">Class</span>
         <span class="tile-value tile-value-text">make:class</span>

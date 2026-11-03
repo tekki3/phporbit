@@ -18,6 +18,8 @@ use PhpOrbit\Config\Environment;
 use PhpOrbit\Config\InvalidEnvFile;
 use PhpOrbit\Config\MissingConfiguration;
 use PhpOrbit\Console\ClassMaker;
+use PhpOrbit\Console\AuthMaker;
+use PhpOrbit\Console\AuthAdmin;
 use PhpOrbit\Console\ControllerMaker;
 use PhpOrbit\Console\FormMaker;
 use PhpOrbit\Console\Lifetime;
@@ -82,6 +84,11 @@ $parseOptions = static function (array $argv): array {
 
 $usage = <<<TXT
 Commands:
+  orbit make:auth
+      Generate login, verified registration, MFA, profiles and administrator
+      user management. Never overwrites existing files.
+  orbit auth:admin <email>
+      Grant administrator access to an existing verified, active scaffolded account.
   orbit key:generate
       Generate and print a new application key; it does not change any files.
   orbit make:class <Name> [--singleton|--scoped] [--force]
@@ -161,6 +168,38 @@ try {
         // and makes it obvious that the value belongs in configuration the
         // deployment supplies rather than in a file someone might commit.
         echo Key::generate()->exportForConfiguration() . PHP_EOL;
+        exit(0);
+
+    case 'make:auth':
+        try {
+            if ($options !== [] || count($arguments) !== 1) {
+                throw new InvalidArgumentException('Usage: orbit make:auth (no options; existing files are never overwritten).');
+            }
+            $files = (new AuthMaker($root))->create();
+            printf("Generated authentication: %d files.\n\n", count($files));
+            echo "New blank projects load app/auth.php automatically.\n";
+            echo "For older projects, add inside the boot callback, after service bindings:\n  " . AuthMaker::WIRING . "\n\n";
+            echo "Next: configure APP_URL and SMTP, run orbit migrate, then visit /register.\n";
+            echo "After verifying your account: orbit auth:admin your@email.example\n";
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+        exit(0);
+
+    case 'auth:admin':
+        try {
+            if (count($arguments) !== 2 || !is_string($arguments[1]) || $options !== []) {
+                throw new InvalidArgumentException('Usage: orbit auth:admin <verified-email>');
+            }
+            $env = Environment::load($root . '/.env');
+            $database = Connection::connect(\PhpOrbit\Database\DatabaseSettings::fromEnvironment($env, $root));
+            (new AuthAdmin($database))->promote($arguments[1]);
+            echo "Administrator access granted. Sign in again to refresh your session.\n";
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
         exit(0);
 
     case 'make:class':

@@ -30,6 +30,7 @@
         <p>One sign-in pipeline, several primary methods: password, email link, Google or Microsoft Entra ID. An enrolled authenticator remains mandatory for all of them. External accounts are linked explicitly from an existing, password-confirmed account; matching email addresses never create or link accounts.</p>
 
 <h2>Try the complete demo</h2>
+<p>For a new application rather than this repository's demo, generate the same security flows plus verified registration and user management with <code>php orbit make:auth</code>.</p>
 <figure class="code"><figcaption>Shell</figcaption><pre><code>composer install
 php orbit migrate
 php orbit db:seed
@@ -77,6 +78,42 @@ php orbit serve</code></pre></figure>
 <p>For local development register the exact loopback callback URL, matching <code>APP_URL</code>, including port and whether you used <code>localhost</code> or <code>127.0.0.1</code>. Real provider credentials and consent are required to test the complete external service; deterministic tests use locally signed JWTs and a fake HTTP transport, not real Google or Microsoft sessions.</p>
 
 <h2>Reusable framework APIs</h2>
+<h3>Scaffold a complete authentication module</h3>
+<figure class="code"><figcaption>Shell</figcaption><pre><code>php orbit new my-app
+cd my-app
+composer install
+php orbit make:auth
+<span class="tk-comment"># Set MAIL_DRIVER=smtp, SMTP credentials and APP_URL in .env.</span>
+php orbit migrate
+php orbit serve</code></pre></figure>
+<p>Visit <code>/register</code>. Registration sends a one-use, hashed verification link that expires after thirty minutes. It stores a pending registration, not a sign-in-capable user. A CSRF-protected confirmation POST creates the account; a mail scanner's GET does not. Re-submit the registration form to request another email. Expired pending rows are reclaimed on new requests. Pending and verified passwords are hashed with <code>PasswordHasher</code>. Registrations, verification mail and reset links never enter the readable mail audit.</p>
+<p>The default <code>MAIL_DRIVER=array</code> cannot deliver verification email, so registration shows an explicit configuration error rather than granting an unverified account access. SMTP delivery failures are logged without message contents, and the browser receives the same generic response as duplicate addresses and account-wide throttles. As with other email flows, network timing can still vary. Production deployments should add trusted edge-level abuse limits.</p>
+<p>After registering and verifying your own email, appoint the first administrator from a trusted terminal:</p>
+<figure class="code"><figcaption>Shell</figcaption><pre><code>php orbit auth:admin you@example.com</code></pre></figure>
+<p>Everyone registers as a normal member. No automatic first-user administrator, default credentials or unauthenticated elevation route exists. Administrators can list users in pages of 25, block/unblock and grant/remove administrator access. Each change requires the acting administrator's password and an unused MFA/recovery code if enabled. The actor is rechecked inside a transaction, management changes are serialized with a database lock row, and changes revoke the affected user's sessions and pending challenges. Administrators cannot block or demote themselves, and the last active administrator cannot be removed. Unblocking does not revive revoked sessions.</p>
+<p>Members can change their own display name at <code>/account</code>; email is deliberately read-only so an edit cannot bypass verification. Account security lives at <code>/account/security</code>, user management at <code>/account/users</code>. Registration, login, reset and magic-link pages are linked from the generated account layout. MFA and explicitly linked OAuth/OIDC accounts reuse the existing framework services.</p>
+<div class="scroller"><table>
+<thead><tr><th>Generated path</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>app/auth.php</code></td><td>Boot-time service bindings and authentication route loading.</td></tr>
+<tr><td><code>app/auth-routes.php</code></td><td>Public authentication routes and guarded account/admin routes.</td></tr>
+<tr><td><code>app/src/AuthKit/</code></td><td>Editable user/provider, registration, guards, helpers and single-action controllers.</td></tr>
+<tr><td><code>app/templates/auth-kit/</code></td><td>Independent account layout and escaped forms; no JavaScript or inline CSS.</td></tr>
+<tr><td><code>public/assets/css/auth.css</code></td><td>Self-contained copy of the demo stylesheet; does not replace your existing CSS.</td></tr>
+<tr><td><code>database/migrations/*_create_auth_kit.php</code></td><td>Reversible schema for verified users, pending registrations, management lock, throttling and shared security tables.</td></tr>
+<tr><td><code>tests/AuthKitTest.php</code></td><td>Generated round-trip tests for verification, MFA, profiles, blocking and administrator permissions.</td></tr>
+</tbody></table></div>
+<p>The command checks every output path before writing and never overwrites existing code, including on a second run. There is deliberately no <code>--force</code>; edit generated files normally. It does not change your <code>.env</code>, application layout or existing routes. New blank projects have an optional boot hook for <code>app/auth.php</code>. In an older application, add the following <em>inside</em> its boot callback after registering <code>Connection</code>, <code>Environment</code>, <code>Logger</code>, <code>TemplateEngine</code> and encryption services, before the container freezes:</p>
+<figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
+<span class="tk-var">$configureAuth</span> <span class="tk-p">=</span> <span class="tk-keyword">require</span> <span class="tk-var">$root</span> <span class="tk-p">.</span> <span class="tk-string">&#039;/app/auth.php&#039;</span><span class="tk-p">;</span>
+<span class="tk-keyword">if</span> <span class="tk-p">(</span><span class="tk-p">!</span><span class="tk-var">$configureAuth</span> <span class="tk-keyword">instanceof</span> <span class="tk-class">\Closure</span><span class="tk-p">)</span> <span class="tk-p">{</span>
+    <span class="tk-keyword">throw</span> <span class="tk-keyword">new</span> <span class="tk-class">\RuntimeException</span><span class="tk-p">(</span><span class="tk-string">&#039;app/auth.php must return a boot callback.&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-p">}</span>
+<span class="tk-var">$configureAuth</span><span class="tk-p">(</span><span class="tk-var">$app</span><span class="tk-p">,</span> <span class="tk-var">$env</span><span class="tk-p">,</span> <span class="tk-var">$root</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+<p>Keep <code>SessionMiddleware</code> before <code>CsrfMiddleware</code>. Generate an <code>APP_KEY</code> with <code>orbit key:generate</code> if your existing application has none. Add links to <code>/login</code>, <code>/register</code> and <code>/account</code> in your own site's layout as appropriate. Restart long-lived workers after generation or configuration changes. Neither generation nor administrator promotion boots or migrates the application implicitly.</p>
+<p>This generator is intended for blank or not-yet-authenticated applications. It refuses the existing demo provider rather than installing conflicting logins. In a customized existing application, first check for conflicting URLs, <code>UserProvider</code>/<code>Authenticator</code> bindings, <code>auth_*</code> tables and migration ordering. Integrate with existing authentication manually instead of registering two systems. The module uses a separate <code>auth_users</code> table, and does not migrate your existing users. Run <code>composer test</code> and <code>composer stan</code> after installation; the generated tests exercise one boot handling multiple visitors.</p>
+
+<h3>Assemble your own application</h3>
 <p>The framework classes are optional; blank scaffolds do not suddenly gain accounts or authentication routes. A demo scaffold includes the complete application. In an existing application, provide <code>Identity</code>/<code>UserProvider</code>, install the ordinary users and <code>auth_attempts</code> tables, and add a migration returning the reusable security schema:</p>
 <figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
 <span class="tk-keyword">declare</span><span class="tk-p">(</span>strict_types<span class="tk-p">=</span><span class="tk-num">1</span><span class="tk-p">)</span><span class="tk-p">;</span>
