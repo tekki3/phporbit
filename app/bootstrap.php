@@ -80,7 +80,7 @@ return Application::boot(
         // locating templates or deriving a password-hash decoy per request
         // would waste the worker model — the hasher's constructor alone costs
         // a full Argon2 computation.
-        // DB_DRIVER selects sqlite, mysql or pgsql; the settings are validated
+        // DB_DRIVER selects sqlite, mysql, pgsql or sqlsrv; the settings are validated
         // here so a bad host or a missing database name stops the application
         // starting rather than failing on whichever request queries first.
         $database = Connection::connect(DatabaseSettings::fromEnvironment($env, $root));

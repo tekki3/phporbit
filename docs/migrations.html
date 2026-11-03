@@ -37,15 +37,17 @@
 <span class="tk-keyword">return</span> <span class="tk-keyword">new</span> <span class="tk-keyword">class</span> <span class="tk-keyword">implements</span> <span class="tk-class">Migration</span> <span class="tk-p">{</span>
     <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">up</span><span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
     <span class="tk-p">{</span>
-        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span>
+        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-fn">sprintf</span><span class="tk-p">(</span>
             <span class="tk-string">&#039;CREATE TABLE articles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                body TEXT NOT NULL,
-                author_id INTEGER NOT NULL REFERENCES users(id),
-                created_at TEXT NOT NULL
+                id %s,
+                title %s NOT NULL,
+                body %s NOT NULL,
+                created_at VARCHAR(40) NOT NULL
             )&#039;</span><span class="tk-p">,</span>
-        <span class="tk-p">)</span><span class="tk-p">;</span>
+            <span class="tk-var">$database</span>-&gt;<span class="tk-fn">driver</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">autoIncrementPrimaryKey</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+            <span class="tk-var">$database</span>-&gt;<span class="tk-fn">driver</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">textType</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+            <span class="tk-var">$database</span>-&gt;<span class="tk-fn">driver</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">textType</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
 
         <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-string">&#039;CREATE INDEX articles_author ON articles(author_id)&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
     <span class="tk-p">}</span>
@@ -131,7 +133,10 @@ Reversed 0003_create_articles
 <figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
 <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">up</span><span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
 <span class="tk-p">{</span>
-    <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-string">&#039;ALTER TABLE users ADD COLUMN display_name TEXT&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span>
+    <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-fn">sprintf</span><span class="tk-p">(</span>
+        <span class="tk-string">&#039;ALTER TABLE users ADD COLUMN display_name %s&#039;</span><span class="tk-p">,</span>
+        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">driver</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">textType</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
 
     <span class="tk-keyword">foreach</span> <span class="tk-p">(</span><span class="tk-var">$database</span>-&gt;<span class="tk-fn">select</span><span class="tk-p">(</span><span class="tk-string">&#039;SELECT id, email FROM users&#039;</span><span class="tk-p">)</span> <span class="tk-keyword">as</span> <span class="tk-var">$user</span><span class="tk-p">)</span> <span class="tk-p">{</span>
         <span class="tk-var">$database</span>-&gt;<span class="tk-fn">execute</span><span class="tk-p">(</span>

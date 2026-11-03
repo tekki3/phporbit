@@ -15,6 +15,7 @@ return [
 
 <ul>
 <li><strong>PHP 8.3 or newer</strong>, with <code>pdo_sqlite</code>, <code>mbstring</code>, <code>fileinfo</code> and <code>sodium</code>. SQLite stores your database in a file; no database server is needed for this guide.</li>
+<li>For another supported database, install its PDO driver: <code>pdo_mysql</code>, <code>pdo_pgsql</code> or <code>pdo_sqlsrv</code>.</li>
 <li><strong><a href="https://getcomposer.org/">Composer</a></strong>, PHP's package manager. It downloads phporbit and the libraries your application needs.</li>
 <li>A text editor and a browser.</li>
 </ul>

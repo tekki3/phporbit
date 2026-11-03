@@ -72,8 +72,8 @@ the `app/bootstrap.php` line to paste.
 - An `UPDATE`/`DELETE` with no `where()` throws unless you call
   `affectingEveryRow()`.
 - Migrations: `./orbit make:migration create_things_table`. Use
-  `$database->driver()->autoIncrementPrimaryKey()` — the three supported engines
-  spell it differently. Index `VARCHAR`, not `TEXT` (MySQL cannot index `TEXT`).
+  `$database->driver()->autoIncrementPrimaryKey()` — the supported engines spell
+  it differently. Index `VARCHAR`, not `TEXT` (MySQL cannot index `TEXT`).
 - `down()` is required. Throw `IrreversibleMigration` if a change cannot be undone.
 
 ## Models

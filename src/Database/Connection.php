@@ -50,7 +50,7 @@ final class Connection
     /**
      * Opens a connection from validated settings.
      *
-     * The three PDO attributes are not optional extras. Exceptions make a
+     * The PDO attributes are not optional extras. Exceptions make a
      * failure impossible to ignore, associative fetches are what
      * {@see narrowRow()} expects, and **emulated prepares must be off**: with
      * emulation on, PDO interpolates values itself before sending the query,
@@ -60,15 +60,20 @@ final class Connection
     public static function connect(DatabaseSettings $settings): self
     {
         try {
+            $attributes = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ];
+
+            if ($settings->driver->supportsEmulatedPreparesOption()) {
+                $attributes[PDO::ATTR_EMULATE_PREPARES] = false;
+            }
+
             $pdo = new PDO(
                 $settings->dsn(),
                 $settings->username,
                 $settings->password,
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false,
-                ],
+                $attributes,
             );
         } catch (PDOException $e) {
             // The DSN names the host and database but carries no credentials,
@@ -92,7 +97,7 @@ final class Connection
     }
 
     /**
-     * Per-connection settings that make the three engines behave alike.
+     * Per-connection settings that make the database engines behave alike.
      */
     private function applySessionDefaults(DatabaseSettings $settings): void
     {
@@ -111,6 +116,10 @@ final class Connection
             Driver::PostgreSql => $this->pdo->exec(
                 sprintf("SET client_encoding TO '%s'", $settings->charset === 'utf8' ? 'UTF8' : $settings->charset),
             ),
+
+            // PDO_SQLSRV uses native prepares and has no per-session default
+            // that the framework needs to change.
+            Driver::SqlServer => null,
         };
     }
 

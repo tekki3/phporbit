@@ -8,16 +8,17 @@ use PhpOrbit\Database\Migration;
 return new class implements Migration {
     public function up(Connection $database): void
     {
-        // The primary key is the one part of this schema the three engines
-        // spell differently; TEXT and the rest are accepted by all of them.
+        // The primary key and unbounded text types are engine-specific.
         $database->executeSchema(sprintf(
             'CREATE TABLE notes (
                 id %s,
-                title TEXT NOT NULL,
-                body TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                title %s NOT NULL,
+                body %s NOT NULL,
+                created_at VARCHAR(40) NOT NULL
             )',
             $database->driver()->autoIncrementPrimaryKey(),
+            $database->driver()->textType(),
+            $database->driver()->textType(),
         ));
     }
 

@@ -50,14 +50,15 @@ final class Migrator
     public function prepare(): void
     {
         // VARCHAR rather than TEXT: this column is the primary key, and MySQL
-        // cannot index TEXT without a prefix length.
-        $this->database->executeSchema(sprintf(
-            'CREATE TABLE IF NOT EXISTS %s (
+        // cannot index TEXT without a prefix length. SQL Server does not
+        // support CREATE TABLE IF NOT EXISTS.
+        $this->database->executeSchema($this->database->driver()->createTableIfNotExists(
+            self::LEDGER_TABLE,
+            '
                 name VARCHAR(191) PRIMARY KEY,
                 batch INTEGER NOT NULL,
-                applied_at TEXT NOT NULL
-            )',
-            self::LEDGER_TABLE,
+                applied_at VARCHAR(40) NOT NULL
+            ',
         ));
     }
 

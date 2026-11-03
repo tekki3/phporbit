@@ -443,7 +443,7 @@ return new class implements Migration {
         $database->executeSchema(sprintf(
             'CREATE TABLE articles (
                 id %s,
-                created_at TEXT NOT NULL
+                created_at VARCHAR(40) NOT NULL
             )',
             $database->driver()->autoIncrementPrimaryKey(),
         ));
@@ -456,7 +456,7 @@ return new class implements Migration {
 };
 [[/php]]
 
-<p>Note the primary key: generated migrations are portable across SQLite, MySQL and PostgreSQL from the start, because that is the one part of the schema the three engines spell differently.</p>
+<p>Note the primary key: generated migrations are portable across SQLite, MySQL, PostgreSQL and SQL Server from the start, because that is the one part of the schema each engine spells differently.</p>
 
 <h3>The filename prefix</h3>
 

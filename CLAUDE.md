@@ -170,9 +170,9 @@ If you construct a `MultipartParser` directly outside an `Application`, nothing 
 
 ## Database engines
 
-SQLite, MySQL/MariaDB and PostgreSQL, selected by `DB_DRIVER` in `.env` and validated at boot by `DatabaseSettings::fromEnvironment()` — a bad driver name or port stops the process rather than failing on the first query.
+SQLite, MySQL/MariaDB, PostgreSQL and Microsoft SQL Server, selected by `DB_DRIVER` in `.env` and validated at boot by `DatabaseSettings::fromEnvironment()` — a bad driver name or port stops the process rather than failing on the first query.
 
-**Every engine difference lives in `Database\Driver`**, not scattered through the query builder as conditionals. Adding an engine means implementing those methods and nothing else. The differences that actually matter: MySQL quotes identifiers with backticks (double quotes are a *string literal* there), a bare `OFFSET` is a syntax error on SQLite and MySQL, auto-increment keys are spelled three ways, and PostgreSQL's `lastInsertId()` returns the last value from *any* sequence in the session — so `insert()` uses `RETURNING` there.
+**Every engine difference lives in `Database\Driver`**, not scattered through the query builder as conditionals. Adding an engine means implementing those methods and nothing else. The differences that actually matter: MySQL quotes identifiers with backticks (double quotes are a *string literal* there), SQL Server uses bracket quoting and `OFFSET/FETCH`, auto-increment keys are engine-specific, PostgreSQL's `lastInsertId()` returns the last value from *any* sequence in the session — so `insert()` uses `RETURNING` there — and SQL Server returns identity values through `OUTPUT INSERTED`.
 
 Quoting is per connection rather than by setting MySQL's `sql_mode` to `ANSI_QUOTES`: that would change how every other statement on the connection parses, including hand-written SQL.
 
@@ -295,7 +295,7 @@ Convention over configuration, minimum ceremony between install and a route retu
 
 ## Code generation (`orbit make:*`)
 
-`Console\MigrationMaker` writes a migration. The filename prefix is a **timestamp by default** — the migrator orders by filename, and timestamps are what let two branches add migrations without coordinating; `--sequential` gives the `0001` counter style instead. The name picks the starting contents (`create_x_table` → CREATE TABLE, `add_x_to_y` → ALTER, anything else → a blank pair), which is a convenience and never load-bearing. **Generated migrations use `$database->driver()->autoIncrementPrimaryKey()`**, so they are portable across all three engines from the start.
+`Console\MigrationMaker` writes a migration. The filename prefix is a **timestamp by default** — the migrator orders by filename, and timestamps are what let two branches add migrations without coordinating; `--sequential` gives the `0001` counter style instead. The name picks the starting contents (`create_x_table` → CREATE TABLE, `add_x_to_y` → ALTER, anything else → a blank pair), which is a convenience and never load-bearing. **Generated migrations use `$database->driver()->autoIncrementPrimaryKey()` and `textType()` where needed**, so they account for engine-specific identity and large-text types.
 
 Names are normalised freely (`CreateArticlesTable`, `create articles table`) because a name is words — but a path separator is refused rather than rewritten, since it means the caller was aiming somewhere. `--table` is validated as an identifier, because no driver can bind one.
 

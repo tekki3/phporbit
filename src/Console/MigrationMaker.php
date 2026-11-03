@@ -179,13 +179,11 @@ final class MigrationMaker
             return new class implements Migration {
                 public function up(Connection \$database): void
                 {
-                    // The primary key is the one part of this the three engines spell
-                    // differently. Index VARCHAR rather than TEXT columns: MySQL cannot
-                    // build an index on TEXT without a prefix length.
+                    // The primary key and unbounded text type are engine-specific.
                     \$database->executeSchema(sprintf(
                         'CREATE TABLE {$table} (
                             id %s,
-                            created_at TEXT NOT NULL
+                            created_at VARCHAR(40) NOT NULL
                         )',
                         \$database->driver()->autoIncrementPrimaryKey(),
                     ));
@@ -213,7 +211,10 @@ final class MigrationMaker
             return new class implements Migration {
                 public function up(Connection \$database): void
                 {
-                    \$database->executeSchema('ALTER TABLE {$table} ADD COLUMN example TEXT NULL');
+                    \$database->executeSchema(sprintf(
+                        'ALTER TABLE {$table} ADD COLUMN example %s NULL',
+                        \$database->driver()->textType(),
+                    ));
                 }
 
                 public function down(Connection \$database): void

@@ -31,20 +31,22 @@
 
 <h2>Choosing an engine</h2>
 
-<p>SQLite, MySQL/MariaDB and PostgreSQL are supported. Pick one in <code>.env</code>; nothing in your application changes.</p>
+<p>SQLite, MySQL/MariaDB, PostgreSQL and Microsoft SQL Server 2012 or newer are supported. Pick one in <code>.env</code>; nothing in your application changes.</p>
 
-<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-comment"># sqlite | mysql | pgsql   (&quot;postgres&quot;, &quot;postgresql&quot; and &quot;mariadb&quot; also work)</span>
+<figure class="code"><figcaption>.env</figcaption><pre><code><span class="tk-comment"># sqlite | mysql | pgsql | sqlsrv</span>
+<span class="tk-comment"># (&quot;postgres&quot;, &quot;postgresql&quot;, &quot;mariadb&quot;, &quot;sqlserver&quot;, &quot;sql_server&quot; and &quot;mssql&quot; also work)</span>
 <span class="tk-var">DB_DRIVER</span><span class="tk-p">=</span><span class="tk-string">sqlite</span>
 
 <span class="tk-comment"># sqlite: a file path, resolved against the project root. &quot;:memory:&quot; works too.</span>
-<span class="tk-comment"># mysql/pgsql: the database name, and required.</span>
+<span class="tk-comment"># mysql/pgsql/sqlsrv: the database name, and required.</span>
 <span class="tk-var">DB_DATABASE</span><span class="tk-p">=</span><span class="tk-string">storage/app.sqlite</span>
 
-<span class="tk-comment"># Ignored by sqlite. Port defaults to 3306 (mysql) or 5432 (pgsql).</span>
+<span class="tk-comment"># Ignored by sqlite. Port defaults to 3306 (mysql), 5432 (pgsql) or 1433 (sqlsrv).</span>
 <span class="tk-comment">#DB_HOST=127.0.0.1</span>
 <span class="tk-comment">#DB_PORT=3306</span>
 <span class="tk-comment">#DB_USERNAME=orbit</span>
 <span class="tk-comment">#DB_PASSWORD=</span>
+<span class="tk-comment"># DB_CHARSET applies to mysql and pgsql. PDO_SQLSRV uses UTF-8 by default.</span>
 <span class="tk-comment">#DB_CHARSET=utf8mb4</span>
 <span class="tk-comment">#DB_SOCKET=/var/run/mysqld/mysqld.sock</span></code></pre></figure>
 
@@ -58,13 +60,16 @@
 <span class="tk-comment">// Or explicitly, without an .env</span>
 <span class="tk-var">$database</span> <span class="tk-p">=</span> <span class="tk-class">Connection</span>::<span class="tk-fn">connect</span><span class="tk-p">(</span><span class="tk-class">DatabaseSettings</span>::<span class="tk-fn">postgres</span><span class="tk-p">(</span><span class="tk-string">&#039;orbit&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;db.internal&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
 <span class="tk-var">$database</span> <span class="tk-p">=</span> <span class="tk-class">Connection</span>::<span class="tk-fn">connect</span><span class="tk-p">(</span><span class="tk-class">DatabaseSettings</span>::<span class="tk-fn">mysql</span><span class="tk-p">(</span><span class="tk-string">&#039;orbit&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;db.internal&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
+<span class="tk-var">$database</span> <span class="tk-p">=</span> <span class="tk-class">Connection</span>::<span class="tk-fn">connect</span><span class="tk-p">(</span><span class="tk-class">DatabaseSettings</span>::<span class="tk-fn">sqlServer</span><span class="tk-p">(</span><span class="tk-string">&#039;orbit&#039;</span><span class="tk-p">,</span> <span class="tk-string">&#039;db.internal&#039;</span><span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
 <span class="tk-var">$database</span> <span class="tk-p">=</span> <span class="tk-class">Connection</span>::<span class="tk-fn">sqlite</span><span class="tk-p">(</span><span class="tk-var">$root</span> <span class="tk-p">.</span> <span class="tk-string">&#039;/storage/app.sqlite&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
 
 <p>Settings are validated at boot, so a missing database name or an out-of-range port stops the application starting rather than surfacing on whichever request queries first:</p>
 
+<p>SQL Server requires the <code>pdo_sqlsrv</code> PHP extension. Its connection enables encryption and verifies the server certificate; install a trusted certificate on the database server rather than disabling verification in production.</p>
+
 <figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>./orbit routes
 Configuration error: Setting &quot;DB_DRIVER&quot; is not a valid database driver.
-Accepted values: sqlite, mysql, pgsql.</code></pre></figure>
+Accepted values: sqlite, mysql, pgsql, sqlsrv.</code></pre></figure>
 
 <h2>What the framework smooths over</h2>
 
@@ -72,10 +77,10 @@ Accepted values: sqlite, mysql, pgsql.</code></pre></figure>
 <table>
 <thead><tr><th>Difference between engines</th><th>How it is handled</th></tr></thead>
 <tbody>
-<tr><td>MySQL reads <code>"x"</code> as a string, not an identifier</td><td>Identifiers are quoted with backticks there, double quotes elsewhere.</td></tr>
-<tr><td><code>OFFSET</code> without <code>LIMIT</code> is a syntax error on two of the three</td><td>The builder emits each engine's idiom.</td></tr>
-<tr><td>Auto-increment keys are spelled three ways</td><td><code>$database-&gt;driver()-&gt;autoIncrementPrimaryKey()</code>, for migrations.</td></tr>
+<tr><td>Identifiers and paging have engine-specific syntax</td><td>Identifiers use the engine's delimiter; SQL Server paging uses <code>OFFSET/FETCH</code>.</td></tr>
+<tr><td>Auto-increment keys are spelled differently</td><td><code>$database-&gt;driver()-&gt;autoIncrementPrimaryKey()</code>, for migrations.</td></tr>
 <tr><td>PostgreSQL's <code>lastInsertId()</code> is session-wide</td><td><code>insert()</code> uses <code>RETURNING</code> there.</td></tr>
+<tr><td>SQL Server returns inserted identity values with <code>OUTPUT</code></td><td><code>insert()</code> reads the generated key from <code>OUTPUT INSERTED</code>.</td></tr>
 <tr><td>MySQL truncates over-long values by default</td><td>A strict <code>sql_mode</code> is set per connection.</td></tr>
 <tr><td>SQLite ignores foreign keys by default</td><td><code>PRAGMA foreign_keys</code> is set per connection.</td></tr>
 </tbody>
@@ -118,12 +123,16 @@ Accepted values: sqlite, mysql, pgsql.</code></pre></figure>
     <span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-var">$title</span><span class="tk-p">,</span> <span class="tk-string">&#039;id&#039;</span> =&gt; <span class="tk-var">$id</span><span class="tk-p">]</span><span class="tk-p">,</span>
 <span class="tk-p">)</span><span class="tk-p">;</span>
 
-<span class="tk-var">$id</span> <span class="tk-p">=</span> (int) <span class="tk-var">$database</span>-&gt;<span class="tk-fn">lastInsertId</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+<span class="tk-var">$id</span> <span class="tk-p">=</span> <span class="tk-var">$database</span>-&gt;<span class="tk-fn">query</span><span class="tk-p">(</span><span class="tk-string">&#039;articles&#039;</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">insert</span><span class="tk-p">(</span><span class="tk-p">[</span><span class="tk-string">&#039;title&#039;</span> =&gt; <span class="tk-var">$title</span><span class="tk-p">]</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
 
 <h2>Schema statements</h2>
 
 <figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
-<span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-string">&#039;CREATE TABLE articles (id INTEGER PRIMARY KEY, title TEXT NOT NULL)&#039;</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
+<span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-fn">sprintf</span><span class="tk-p">(</span>
+    <span class="tk-string">&#039;CREATE TABLE articles (id %s, title %s NOT NULL)&#039;</span><span class="tk-p">,</span>
+    <span class="tk-var">$database</span>-&gt;<span class="tk-fn">driver</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">autoIncrementPrimaryKey</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+    <span class="tk-var">$database</span>-&gt;<span class="tk-fn">driver</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">textType</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+<span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span></code></pre></figure>
 
 <p>Separate from <code>execute()</code> because it binds nothing. Reaching for a method with no parameter binding should be a visible decision, not a convenient shortcut for interpolating a value.</p>
 
@@ -217,7 +226,7 @@ Accepted values: sqlite, mysql, pgsql.</code></pre></figure>
 
 <h2>Portable migrations</h2>
 
-<p>Most DDL is accepted by all three. The primary key is not:</p>
+<p>Most DDL is accepted by all four. Primary keys and unbounded text types are selected through the driver:</p>
 
 <figure class="code"><figcaption>PHP</figcaption><pre><code><span class="tk-p">&lt;</span><span class="tk-p">?</span>php
 <span class="tk-keyword">public</span> <span class="tk-keyword">function</span> <span class="tk-fn">up</span><span class="tk-p">(</span><span class="tk-class">Connection</span> <span class="tk-var">$database</span><span class="tk-p">)</span><span class="tk-p">:</span> <span class="tk-keyword">void</span>
@@ -225,17 +234,19 @@ Accepted values: sqlite, mysql, pgsql.</code></pre></figure>
     <span class="tk-var">$database</span>-&gt;<span class="tk-fn">executeSchema</span><span class="tk-p">(</span><span class="tk-fn">sprintf</span><span class="tk-p">(</span>
         <span class="tk-string">&#039;CREATE TABLE notes (
             id %s,
-            title TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            title %s NOT NULL,
+            created_at VARCHAR(40) NOT NULL
         )&#039;</span><span class="tk-p">,</span>
         <span class="tk-var">$database</span>-&gt;<span class="tk-fn">driver</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">autoIncrementPrimaryKey</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
+        <span class="tk-var">$database</span>-&gt;<span class="tk-fn">driver</span><span class="tk-p">(</span><span class="tk-p">)</span>-&gt;<span class="tk-fn">textType</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">,</span>
     <span class="tk-p">)</span><span class="tk-p">)</span><span class="tk-p">;</span>
 <span class="tk-p">}</span></code></pre></figure>
 
 <div class="warn">
 <b>Two things to watch when targeting MySQL</b>
 <p><strong>Index a <code>VARCHAR</code>, not a <code>TEXT</code>.</strong> MySQL cannot build a unique index on a <code>TEXT</code> column without a prefix length, so columns you intend to index should be declared <code>VARCHAR(n)</code>.</p>
-<p><strong>DDL is not transactional.</strong> SQLite and PostgreSQL roll a failed migration back cleanly; MySQL commits implicitly on most schema changes, so a failure there can leave a half-applied migration behind. Keep MySQL migrations small for that reason — <code>$database-&gt;driver()-&gt;supportsTransactionalDdl()</code> reports which you are on.</p>
+<p><strong>DDL is not transactional on MySQL.</strong> SQLite, PostgreSQL and SQL Server roll a failed migration back cleanly; MySQL commits implicitly on most schema changes, so a failure there can leave a half-applied migration behind. Keep MySQL migrations small for that reason — <code>$database-&gt;driver()-&gt;supportsTransactionalDdl()</code> reports which you are on.</p>
+<p>SQL Server uses <code>NVARCHAR(MAX)</code> rather than the deprecated <code>TEXT</code> type for comparable, unbounded text columns. Use <code>textType()</code> when a migration needs one.</p>
 </div>
     </article>
     <nav class="pager"><a href="templates.html"><span>Previous</span>Templates</a><a class="next" href="queries.html"><span>Next</span>Query builder</a></nav>

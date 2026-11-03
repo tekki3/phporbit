@@ -12,12 +12,15 @@ return new class implements Migration {
             'CREATE TABLE users (
                 id %s,
                 email VARCHAR(255) NOT NULL,
-                password_hash TEXT NOT NULL,
-                display_name TEXT NOT NULL,
-                avatar_path TEXT NULL,
-                created_at TEXT NOT NULL
+                password_hash %s NOT NULL,
+                display_name %s NOT NULL,
+                avatar_path %s NULL,
+                created_at VARCHAR(40) NOT NULL
             )',
             $database->driver()->autoIncrementPrimaryKey(),
+            $database->driver()->textType(),
+            $database->driver()->textType(),
+            $database->driver()->textType(),
         ));
 
         // Enforced by the database rather than only by application code: two

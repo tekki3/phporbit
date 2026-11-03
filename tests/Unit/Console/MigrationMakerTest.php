@@ -96,7 +96,7 @@ final class MigrationMakerTest extends TestCase
 
         self::assertStringContainsString('CREATE TABLE articles', $source);
         self::assertStringContainsString('DROP TABLE articles', $source);
-        // Portable across all three engines from the start.
+        // Portable across all supported engines from the start.
         self::assertStringContainsString('autoIncrementPrimaryKey()', $source);
     }
 

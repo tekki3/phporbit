@@ -192,13 +192,15 @@
 
 <h2>Integration tests</h2>
 
-<p>SQLite answers the question &ldquo;does this code run?&rdquo; It cannot answer &ldquo;does MySQL accept this?&rdquo; — and that is a different question, because a double quote is a string literal on MySQL, a bare <code>OFFSET</code> is a syntax error on two of the three engines, and <code>lastInsertId()</code> means something else again on PostgreSQL. The unit tests assert the SQL phporbit <em>generates</em> by inspecting <code>toSql()</code>. The integration tests assert a server <em>accepts</em> it.</p>
+<p>SQLite answers the question &ldquo;does this code run?&rdquo; It cannot answer &ldquo;does another server accept this?&rdquo; — and that is a different question: MySQL uses backticks, SQL Server uses <code>OFFSET/FETCH</code> and <code>OUTPUT</code>, and PostgreSQL's <code>lastInsertId()</code> means something else. The unit tests assert the SQL phporbit <em>generates</em> by inspecting <code>toSql()</code>. The integration tests assert a server <em>accepts</em> it.</p>
 
 <p>The same applies to mail: the unit tests drive the SMTP conversation over a socket pair with scripted replies, which proves phporbit says the right things — not that a server understands them.</p>
 
 <figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-p">$ </span>MYSQL_HOST=127.0.0.1 MYSQL_PORT=3306 MYSQL_DATABASE=orbit_test \
   MYSQL_USERNAME=orbit MYSQL_PASSWORD=orbit \
   vendor/bin/phpunit --testsuite integration</code></pre></figure>
+
+<p>SQL Server integration tests use <code>SQLSRV_HOST</code>, <code>SQLSRV_PORT</code>, <code>SQLSRV_DATABASE</code>, <code>SQLSRV_USERNAME</code> and optional <code>SQLSRV_PASSWORD</code>, and require the <code>pdo_sqlsrv</code> extension.</p>
 
 <div class="note">
 <b>They skip, they do not fail</b>

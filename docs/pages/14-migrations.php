@@ -18,15 +18,17 @@ use PhpOrbit\Database\Migration;
 return new class implements Migration {
     public function up(Connection $database): void
     {
-        $database->executeSchema(
+        $database->executeSchema(sprintf(
             'CREATE TABLE articles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                body TEXT NOT NULL,
-                author_id INTEGER NOT NULL REFERENCES users(id),
-                created_at TEXT NOT NULL
+                id %s,
+                title %s NOT NULL,
+                body %s NOT NULL,
+                created_at VARCHAR(40) NOT NULL
             )',
-        );
+            $database->driver()->autoIncrementPrimaryKey(),
+            $database->driver()->textType(),
+            $database->driver()->textType(),
+        ));
 
         $database->executeSchema('CREATE INDEX articles_author ON articles(author_id)');
     }
@@ -122,7 +124,10 @@ return new class implements Migration {
 <?php
 public function up(Connection $database): void
 {
-    $database->executeSchema('ALTER TABLE users ADD COLUMN display_name TEXT');
+    $database->executeSchema(sprintf(
+        'ALTER TABLE users ADD COLUMN display_name %s',
+        $database->driver()->textType(),
+    ));
 
     foreach ($database->select('SELECT id, email FROM users') as $user) {
         $database->execute(

@@ -283,13 +283,26 @@ final class Query
 
         // PostgreSQL's lastInsertId() calls lastval(), which returns the last
         // value from *any* sequence touched in the session — fine in isolation,
-        // wrong as soon as a trigger writes elsewhere. RETURNING asks the
-        // question that is actually being asked.
+        // wrong as soon as a trigger writes elsewhere. SQL Server also requires
+        // an explicit OUTPUT clause rather than PDO::lastInsertId().
         if ($this->database->driver()->usesReturningForInsertId()) {
             $row = $this->database->selectOne(
                 $sql . ' RETURNING ' . $this->id($key),
                 $bindings,
             );
+
+            return (int) ($row[$key] ?? 0);
+        }
+
+        if ($this->database->driver()->usesOutputForInsertId()) {
+            $insert = sprintf(
+                'INSERT INTO %s (%s) OUTPUT INSERTED.%s VALUES (%s)',
+                $this->id($this->table),
+                implode(', ', $columns),
+                $this->id($key),
+                implode(', ', $placeholders),
+            );
+            $row = $this->database->selectOne($insert, $bindings);
 
             return (int) ($row[$key] ?? 0);
         }
@@ -357,10 +370,36 @@ final class Query
             $this->columns,
         ));
 
-        $sql = 'SELECT ' . $columns . ' FROM ' . $this->id($this->table) . $this->whereClause();
+        $sql = 'SELECT ';
 
-        if ($this->orders !== []) {
-            $sql .= ' ORDER BY ' . implode(', ', $this->orders);
+        if ($this->database->driver()->usesOffsetFetch() && $this->limit !== null && $this->offset === null) {
+            $sql .= sprintf('TOP (%d) ', $this->limit);
+        }
+
+        $sql .= $columns . ' FROM ' . $this->id($this->table) . $this->whereClause();
+
+        $orders = $this->orders;
+
+        if ($this->database->driver()->usesOffsetFetch() && $this->offset !== null && $orders === []) {
+            $orders[] = '(SELECT NULL)';
+        }
+
+        if ($orders !== []) {
+            $sql .= ' ORDER BY ' . implode(', ', $orders);
+        }
+
+        if ($this->database->driver()->usesOffsetFetch()) {
+            if ($this->offset !== null) {
+                $sql .= $this->database->driver()->offsetWithoutLimit($this->offset);
+            } elseif ($this->limit !== null) {
+                return $sql;
+            }
+
+            if ($this->limit !== null) {
+                $sql .= sprintf(' FETCH NEXT %d ROWS ONLY', $this->limit);
+            }
+
+            return $sql;
         }
 
         if ($this->limit !== null) {
@@ -368,8 +407,7 @@ final class Query
         }
 
         if ($this->offset !== null) {
-            // Paging without a cap is spelled differently on each engine, and
-            // two of the three reject a bare OFFSET outright.
+            // Paging without a cap is spelled differently on each engine.
             $sql .= $this->limit === null
                 ? $this->database->driver()->offsetWithoutLimit($this->offset)
                 : ' OFFSET ' . $this->offset;

@@ -11,21 +11,23 @@ return [
 
 <h2>Choosing an engine</h2>
 
-<p>SQLite, MySQL/MariaDB and PostgreSQL are supported. Pick one in <code>.env</code>; nothing in your application changes.</p>
+<p>SQLite, MySQL/MariaDB, PostgreSQL and Microsoft SQL Server 2012 or newer are supported. Pick one in <code>.env</code>; nothing in your application changes.</p>
 
 [[ini]]
-# sqlite | mysql | pgsql   ("postgres", "postgresql" and "mariadb" also work)
+# sqlite | mysql | pgsql | sqlsrv
+# ("postgres", "postgresql", "mariadb", "sqlserver", "sql_server" and "mssql" also work)
 DB_DRIVER=sqlite
 
 # sqlite: a file path, resolved against the project root. ":memory:" works too.
-# mysql/pgsql: the database name, and required.
+# mysql/pgsql/sqlsrv: the database name, and required.
 DB_DATABASE=storage/app.sqlite
 
-# Ignored by sqlite. Port defaults to 3306 (mysql) or 5432 (pgsql).
+# Ignored by sqlite. Port defaults to 3306 (mysql), 5432 (pgsql) or 1433 (sqlsrv).
 #DB_HOST=127.0.0.1
 #DB_PORT=3306
 #DB_USERNAME=orbit
 #DB_PASSWORD=
+# DB_CHARSET applies to mysql and pgsql. PDO_SQLSRV uses UTF-8 by default.
 #DB_CHARSET=utf8mb4
 #DB_SOCKET=/var/run/mysqld/mysqld.sock
 [[/ini]]
@@ -41,15 +43,18 @@ $database = Connection::connect(DatabaseSettings::fromEnvironment($env, $root));
 // Or explicitly, without an .env
 $database = Connection::connect(DatabaseSettings::postgres('orbit', 'db.internal'));
 $database = Connection::connect(DatabaseSettings::mysql('orbit', 'db.internal'));
+$database = Connection::connect(DatabaseSettings::sqlServer('orbit', 'db.internal'));
 $database = Connection::sqlite($root . '/storage/app.sqlite');
 [[/php]]
 
 <p>Settings are validated at boot, so a missing database name or an out-of-range port stops the application starting rather than surfacing on whichever request queries first:</p>
 
+<p>SQL Server requires the <code>pdo_sqlsrv</code> PHP extension. Its connection enables encryption and verifies the server certificate; install a trusted certificate on the database server rather than disabling verification in production.</p>
+
 [[bash]]
 $ ./orbit routes
 Configuration error: Setting "DB_DRIVER" is not a valid database driver.
-Accepted values: sqlite, mysql, pgsql.
+Accepted values: sqlite, mysql, pgsql, sqlsrv.
 [[/bash]]
 
 <h2>What the framework smooths over</h2>
@@ -58,10 +63,10 @@ Accepted values: sqlite, mysql, pgsql.
 <table>
 <thead><tr><th>Difference between engines</th><th>How it is handled</th></tr></thead>
 <tbody>
-<tr><td>MySQL reads <code>"x"</code> as a string, not an identifier</td><td>Identifiers are quoted with backticks there, double quotes elsewhere.</td></tr>
-<tr><td><code>OFFSET</code> without <code>LIMIT</code> is a syntax error on two of the three</td><td>The builder emits each engine's idiom.</td></tr>
-<tr><td>Auto-increment keys are spelled three ways</td><td><code>$database-&gt;driver()-&gt;autoIncrementPrimaryKey()</code>, for migrations.</td></tr>
+<tr><td>Identifiers and paging have engine-specific syntax</td><td>Identifiers use the engine's delimiter; SQL Server paging uses <code>OFFSET/FETCH</code>.</td></tr>
+<tr><td>Auto-increment keys are spelled differently</td><td><code>$database-&gt;driver()-&gt;autoIncrementPrimaryKey()</code>, for migrations.</td></tr>
 <tr><td>PostgreSQL's <code>lastInsertId()</code> is session-wide</td><td><code>insert()</code> uses <code>RETURNING</code> there.</td></tr>
+<tr><td>SQL Server returns inserted identity values with <code>OUTPUT</code></td><td><code>insert()</code> reads the generated key from <code>OUTPUT INSERTED</code>.</td></tr>
 <tr><td>MySQL truncates over-long values by default</td><td>A strict <code>sql_mode</code> is set per connection.</td></tr>
 <tr><td>SQLite ignores foreign keys by default</td><td><code>PRAGMA foreign_keys</code> is set per connection.</td></tr>
 </tbody>
@@ -109,14 +114,18 @@ $changed = $database->execute(
     ['title' => $title, 'id' => $id],
 );
 
-$id = (int) $database->lastInsertId();
+$id = $database->query('articles')->insert(['title' => $title]);
 [[/php]]
 
 <h2>Schema statements</h2>
 
 [[php]]
 <?php
-$database->executeSchema('CREATE TABLE articles (id INTEGER PRIMARY KEY, title TEXT NOT NULL)');
+$database->executeSchema(sprintf(
+    'CREATE TABLE articles (id %s, title %s NOT NULL)',
+    $database->driver()->autoIncrementPrimaryKey(),
+    $database->driver()->textType(),
+));
 [[/php]]
 
 <p>Separate from <code>execute()</code> because it binds nothing. Reaching for a method with no parameter binding should be a visible decision, not a convenient shortcut for interpolating a value.</p>
@@ -223,7 +232,7 @@ $database = new Connection($pdo, Driver::PostgreSql);
 
 <h2>Portable migrations</h2>
 
-<p>Most DDL is accepted by all three. The primary key is not:</p>
+<p>Most DDL is accepted by all four. Primary keys and unbounded text types are selected through the driver:</p>
 
 [[php]]
 <?php
@@ -232,10 +241,11 @@ public function up(Connection $database): void
     $database->executeSchema(sprintf(
         'CREATE TABLE notes (
             id %s,
-            title TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            title %s NOT NULL,
+            created_at VARCHAR(40) NOT NULL
         )',
         $database->driver()->autoIncrementPrimaryKey(),
+        $database->driver()->textType(),
     ));
 }
 [[/php]]
@@ -243,7 +253,8 @@ public function up(Connection $database): void
 <div class="warn">
 <b>Two things to watch when targeting MySQL</b>
 <p><strong>Index a <code>VARCHAR</code>, not a <code>TEXT</code>.</strong> MySQL cannot build a unique index on a <code>TEXT</code> column without a prefix length, so columns you intend to index should be declared <code>VARCHAR(n)</code>.</p>
-<p><strong>DDL is not transactional.</strong> SQLite and PostgreSQL roll a failed migration back cleanly; MySQL commits implicitly on most schema changes, so a failure there can leave a half-applied migration behind. Keep MySQL migrations small for that reason — <code>$database-&gt;driver()-&gt;supportsTransactionalDdl()</code> reports which you are on.</p>
+<p><strong>DDL is not transactional on MySQL.</strong> SQLite, PostgreSQL and SQL Server roll a failed migration back cleanly; MySQL commits implicitly on most schema changes, so a failure there can leave a half-applied migration behind. Keep MySQL migrations small for that reason — <code>$database-&gt;driver()-&gt;supportsTransactionalDdl()</code> reports which you are on.</p>
+<p>SQL Server uses <code>NVARCHAR(MAX)</code> rather than the deprecated <code>TEXT</code> type for comparable, unbounded text columns. Use <code>textType()</code> when a migration needs one.</p>
 </div>
 HTML,
 ];

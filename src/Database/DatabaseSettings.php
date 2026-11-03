@@ -32,10 +32,13 @@ final class DatabaseSettings
             throw new InvalidArgumentException('DB_DATABASE cannot be empty.');
         }
 
-        if ($driver->needsServer() && $host === null && $socket === null) {
+        $mysqlSocketConfigured = $driver === Driver::MySql && $socket !== null && $socket !== '';
+
+        if ($driver->needsServer() && ($host === null || $host === '') && !$mysqlSocketConfigured) {
             throw new InvalidArgumentException(sprintf(
-                'The %s driver needs DB_HOST (or DB_SOCKET).',
+                'The %s driver needs DB_HOST%s.',
                 $driver->value,
+                $driver === Driver::MySql ? ' (or DB_SOCKET)' : '',
             ));
         }
 
@@ -73,6 +76,16 @@ final class DatabaseSettings
         return new self(Driver::PostgreSql, $database, $host, $port, $username, $password, 'utf8');
     }
 
+    public static function sqlServer(
+        string $database,
+        string $host = '127.0.0.1',
+        int $port = 1433,
+        ?string $username = null,
+        ?string $password = null,
+    ): self {
+        return new self(Driver::SqlServer, $database, $host, $port, $username, $password, 'UTF-8');
+    }
+
     /**
      * Reads DB_* settings.
      *
@@ -87,7 +100,7 @@ final class DatabaseSettings
         try {
             $driver = Driver::fromName($config->string('DB_DRIVER', 'sqlite'));
         } catch (ValueError) {
-            throw MissingConfiguration::notOfType('DB_DRIVER', 'database driver', 'sqlite, mysql, pgsql');
+            throw MissingConfiguration::notOfType('DB_DRIVER', 'database driver', 'sqlite, mysql, pgsql, sqlsrv');
         }
 
         if ($driver === Driver::Sqlite) {
@@ -109,7 +122,9 @@ final class DatabaseSettings
             // Blank is legitimate: a local trust-authenticated PostgreSQL, or a
             // MySQL socket login, both have no password.
             $config->string('DB_PASSWORD', ''),
-            $config->string('DB_CHARSET', $driver === Driver::PostgreSql ? 'utf8' : 'utf8mb4'),
+            $driver === Driver::SqlServer
+                ? $driver->defaultCharset()
+                : $config->string('DB_CHARSET', $driver->defaultCharset()),
             $config->raw('DB_SOCKET'),
         );
     }
@@ -123,6 +138,34 @@ final class DatabaseSettings
      */
     public function dsn(): string
     {
+        if ($this->driver->needsServer()) {
+            foreach ([
+                'DB_DATABASE' => $this->database,
+                'DB_HOST' => $this->host,
+            ] as $key => $value) {
+                if ($value !== null && (str_contains($value, ';') || str_contains($value, "\0"))) {
+                    throw new InvalidArgumentException(sprintf(
+                        '%s cannot contain a semicolon or NUL byte.',
+                        $key,
+                    ));
+                }
+            }
+        }
+
+        if ($this->driver !== Driver::SqlServer) {
+            foreach ([
+                'DB_CHARSET' => $this->charset,
+                'DB_SOCKET' => $this->socket,
+            ] as $key => $value) {
+                if ($value !== null && (str_contains($value, ';') || str_contains($value, "\0"))) {
+                    throw new InvalidArgumentException(sprintf(
+                        '%s cannot contain a semicolon or NUL byte.',
+                        $key,
+                    ));
+                }
+            }
+        }
+
         return match ($this->driver) {
             Driver::Sqlite => 'sqlite:' . $this->database,
 
@@ -140,6 +183,13 @@ final class DatabaseSettings
                 'pgsql:host=%s;port=%d;dbname=%s',
                 $this->host,
                 $this->port ?? 5432,
+                $this->database,
+            ),
+
+            Driver::SqlServer => sprintf(
+                'sqlsrv:Server=%s,%d;Database=%s;Encrypt=1;TrustServerCertificate=0',
+                $this->host,
+                $this->port ?? 1433,
                 $this->database,
             ),
         };

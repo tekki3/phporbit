@@ -6,6 +6,9 @@ You need PHP 8.3 or newer with `pdo_sqlite`, `mbstring`, `fileinfo` and
 `sodium`, plus [Composer](https://getcomposer.org/). SQLite is a file-based
 database, so no separate database server is needed.
 
+For MySQL/MariaDB, PostgreSQL or Microsoft SQL Server, install the matching
+PDO driver (`pdo_mysql`, `pdo_pgsql` or `pdo_sqlsrv`) and configure `.env`.
+
 Open a terminal in this folder (the one containing `composer.json`).
 Run these commands one at a time:
 

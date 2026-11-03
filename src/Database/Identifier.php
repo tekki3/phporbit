@@ -16,7 +16,8 @@ use InvalidArgumentException;
  * "escaped well enough?", while a whitelist has one answer.
  *
  * Double quotes are the SQL standard delimiter and work on SQLite and
- * PostgreSQL. MySQL needs `ANSI_QUOTES` enabled, or backticks.
+ * PostgreSQL. MySQL needs `ANSI_QUOTES` enabled, or backticks; SQL Server uses
+ * brackets to avoid depending on its QUOTED_IDENTIFIER setting.
  */
 final class Identifier
 {
@@ -25,11 +26,11 @@ final class Identifier
     /**
      * Quotes `column`, `table.column`, or `*`.
      *
-     * The delimiter varies by engine — double quotes are the SQL standard and
-     * work on SQLite and PostgreSQL, while MySQL needs backticks unless
-     * `ANSI_QUOTES` is set. The *validation* does not vary, and that is the part
-     * that matters: whichever delimiter is used, only plain names get through,
-     * so there is nothing for a delimiter to have to escape.
+     * The delimiter varies by engine — double quotes for SQLite/PostgreSQL,
+     * backticks for MySQL, and brackets for SQL Server. The *validation* does
+     * not vary, and that is the part that matters: whichever delimiter is used,
+     * only plain names get through, so there is nothing for a delimiter to
+     * have to escape.
      */
     public static function quote(string $name, Driver $driver = Driver::Sqlite): string
     {
@@ -68,7 +69,7 @@ final class Identifier
                 ));
             }
 
-            $quoted[] = $delimiter . $part . $delimiter;
+            $quoted[] = $delimiter . $part . $driver->closingDelimiter();
         }
 
         return implode('.', $quoted);

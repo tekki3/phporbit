@@ -7,15 +7,15 @@ namespace PhpOrbit\Tests\Integration;
 /**
  * Skips a test when the server it needs is not there.
  *
- * These tests exist because the rest of the suite cannot reach a real MySQL,
- * PostgreSQL or SMTP server — the per-engine SQL and the SMTP conversation are
+ * These tests exist because the rest of the suite cannot reach real database
+ * or SMTP servers — the per-engine SQL and the SMTP conversation are
  * otherwise only ever checked against what the framework *generates*, never
  * against what a server *accepts*. That is a real gap, and one that no amount
  * of unit testing closes.
  *
  * They skip rather than fail when the service is absent, so `composer test` on
- * a laptop stays useful. CI supplies the services, so the gap is closed on
- * every push instead of never.
+ * a laptop stays useful. Configure the relevant service in the environment to
+ * exercise its integration tests.
  */
 trait RequiresService
 {
@@ -34,7 +34,7 @@ trait RequiresService
 
             if ($value === false || $value === '') {
                 self::markTestSkipped(sprintf(
-                    'No %s available: set %s to run this. CI provides one.',
+                    'No %s available: set %s to run this.',
                     $service,
                     implode(', ', $variables),
                 ));

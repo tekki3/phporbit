@@ -20,9 +20,8 @@ use RuntimeException;
  * Everything here is a claim the unit tests could not check. They assert the
  * SQL phporbit *generates*; these assert a server *accepts* it — which is a
  * different question, and the one that matters. Every engine difference the
- * framework encodes gets exercised: backtick quoting on MySQL, `RETURNING` on
- * PostgreSQL, the three spellings of an auto-increment key, and paging without
- * a limit, which is a syntax error on two of the three.
+ * framework encodes gets exercised: engine-specific quoting, key retrieval,
+ * auto-increment syntax, and paging without a limit.
  */
 final class DatabaseTest extends TestCase
 {
@@ -50,6 +49,7 @@ final class DatabaseTest extends TestCase
     {
         yield 'mysql' => [Driver::MySql];
         yield 'pgsql' => [Driver::PostgreSql];
+        yield 'sqlsrv' => [Driver::SqlServer];
     }
 
     #[DataProvider('servers')]
@@ -235,7 +235,12 @@ final class DatabaseTest extends TestCase
      */
     private function connect(Driver $driver, bool $migrate = true): Connection
     {
-        $prefix = $driver === Driver::MySql ? 'MYSQL' : 'PGSQL';
+        $prefix = match ($driver) {
+            Driver::MySql => 'MYSQL',
+            Driver::PostgreSql => 'PGSQL',
+            Driver::SqlServer => 'SQLSRV',
+            Driver::Sqlite => throw new RuntimeException('SQLite does not use a server connection.'),
+        };
 
         $env = $this->requireEnvironment(
             [$prefix . '_HOST', $prefix . '_PORT', $prefix . '_DATABASE', $prefix . '_USERNAME'],
@@ -248,21 +253,32 @@ final class DatabaseTest extends TestCase
 
         $this->requireReachable($env[$prefix . '_HOST'], (int) $env[$prefix . '_PORT'], $driver->value);
 
-        $settings = $driver === Driver::MySql
-            ? DatabaseSettings::mysql(
+        $password = getenv($prefix . '_PASSWORD');
+        if ($driver === Driver::MySql) {
+            $settings = DatabaseSettings::mysql(
                 $env['MYSQL_DATABASE'],
                 $env['MYSQL_HOST'],
                 (int) $env['MYSQL_PORT'],
                 $env['MYSQL_USERNAME'],
-                getenv('MYSQL_PASSWORD') === false ? null : (string) getenv('MYSQL_PASSWORD'),
-            )
-            : DatabaseSettings::postgres(
+                $password === false ? null : $password,
+            );
+        } elseif ($driver === Driver::PostgreSql) {
+            $settings = DatabaseSettings::postgres(
                 $env['PGSQL_DATABASE'],
                 $env['PGSQL_HOST'],
                 (int) $env['PGSQL_PORT'],
                 $env['PGSQL_USERNAME'],
-                getenv('PGSQL_PASSWORD') === false ? null : (string) getenv('PGSQL_PASSWORD'),
+                $password === false ? null : $password,
             );
+        } else {
+            $settings = DatabaseSettings::sqlServer(
+                $env['SQLSRV_DATABASE'],
+                $env['SQLSRV_HOST'],
+                (int) $env['SQLSRV_PORT'],
+                $env['SQLSRV_USERNAME'],
+                $password === false ? null : $password,
+            );
+        }
 
         $this->database = Connection::connect($settings);
 
@@ -271,9 +287,10 @@ final class DatabaseTest extends TestCase
 
         if ($migrate) {
             $this->database->executeSchema(sprintf(
-                'CREATE TABLE %s (id %s, title VARCHAR(191) NOT NULL, body TEXT NOT NULL, created_at VARCHAR(40) NOT NULL)',
+                'CREATE TABLE %s (id %s, title VARCHAR(191) NOT NULL, body %s NOT NULL, created_at VARCHAR(40) NOT NULL)',
                 $this->table,
                 $this->database->driver()->autoIncrementPrimaryKey(),
+                $this->database->driver()->textType(),
             ));
         }
 

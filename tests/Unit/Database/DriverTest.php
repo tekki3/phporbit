@@ -8,6 +8,7 @@ use PhpOrbit\Config\Environment;
 use PhpOrbit\Database\DatabaseSettings;
 use PhpOrbit\Database\Driver;
 use PhpOrbit\Database\Identifier;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ValueError;
@@ -39,13 +40,16 @@ final class DriverTest extends TestCase
         yield 'pgsql' => ['pgsql', Driver::PostgreSql];
         yield 'postgres' => ['postgres', Driver::PostgreSql];
         yield 'postgresql' => ['postgresql', Driver::PostgreSql];
+        yield 'sqlsrv' => ['sqlsrv', Driver::SqlServer];
+        yield 'sqlserver' => ['sqlserver', Driver::SqlServer];
+        yield 'mssql' => ['mssql', Driver::SqlServer];
         yield 'mixed case and spaces' => ['  PostgreSQL ', Driver::PostgreSql];
     }
 
     public function test_an_unknown_driver_names_the_supported_ones(): void
     {
         $this->expectException(ValueError::class);
-        $this->expectExceptionMessageMatches('/sqlite, mysql, pgsql/');
+        $this->expectExceptionMessageMatches('/sqlite, mysql, pgsql, sqlsrv/');
 
         Driver::fromName('oracle');
     }
@@ -59,8 +63,10 @@ final class DriverTest extends TestCase
         self::assertSame('"title"', Identifier::quote('title', Driver::Sqlite));
         self::assertSame('"title"', Identifier::quote('title', Driver::PostgreSql));
         self::assertSame('`title`', Identifier::quote('title', Driver::MySql));
+        self::assertSame('[title]', Identifier::quote('title', Driver::SqlServer));
 
         self::assertSame('`notes`.`title`', Identifier::quote('notes.title', Driver::MySql));
+        self::assertSame('[notes].[title]', Identifier::quote('notes.title', Driver::SqlServer));
     }
 
     /**
@@ -86,6 +92,7 @@ final class DriverTest extends TestCase
         yield 'sqlite' => [Driver::Sqlite];
         yield 'mysql' => [Driver::MySql];
         yield 'pgsql' => [Driver::PostgreSql];
+        yield 'sqlsrv' => [Driver::SqlServer];
     }
 
     /**
@@ -97,6 +104,7 @@ final class DriverTest extends TestCase
         self::assertSame(' OFFSET 40', Driver::PostgreSql->offsetWithoutLimit(40));
         self::assertSame(' LIMIT -1 OFFSET 40', Driver::Sqlite->offsetWithoutLimit(40));
         self::assertSame(' LIMIT 18446744073709551615 OFFSET 40', Driver::MySql->offsetWithoutLimit(40));
+        self::assertSame(' OFFSET 40 ROWS', Driver::SqlServer->offsetWithoutLimit(40));
     }
 
     public function test_each_engine_spells_an_auto_increment_key_its_own_way(): void
@@ -104,6 +112,7 @@ final class DriverTest extends TestCase
         self::assertStringContainsString('AUTOINCREMENT', Driver::Sqlite->autoIncrementPrimaryKey());
         self::assertStringContainsString('AUTO_INCREMENT', Driver::MySql->autoIncrementPrimaryKey());
         self::assertStringContainsString('BIGSERIAL', Driver::PostgreSql->autoIncrementPrimaryKey());
+        self::assertStringContainsString('IDENTITY(1,1)', Driver::SqlServer->autoIncrementPrimaryKey());
     }
 
     /**
@@ -115,6 +124,7 @@ final class DriverTest extends TestCase
         self::assertTrue(Driver::Sqlite->supportsTransactionalDdl());
         self::assertTrue(Driver::PostgreSql->supportsTransactionalDdl());
         self::assertFalse(Driver::MySql->supportsTransactionalDdl());
+        self::assertTrue(Driver::SqlServer->supportsTransactionalDdl());
     }
 
     public function test_only_postgres_needs_returning_for_the_insert_id(): void
@@ -122,6 +132,17 @@ final class DriverTest extends TestCase
         self::assertTrue(Driver::PostgreSql->usesReturningForInsertId());
         self::assertFalse(Driver::MySql->usesReturningForInsertId());
         self::assertFalse(Driver::Sqlite->usesReturningForInsertId());
+        self::assertTrue(Driver::SqlServer->usesOutputForInsertId());
+    }
+
+    public function test_sql_server_uses_its_native_insert_and_schema_features(): void
+    {
+        self::assertSame('NVARCHAR(MAX)', Driver::SqlServer->textType());
+        self::assertSame(
+            "IF OBJECT_ID(N'orbit_migrations', N'U') IS NULL CREATE TABLE [orbit_migrations] (name VARCHAR(191) PRIMARY KEY)",
+            Driver::SqlServer->createTableIfNotExists('orbit_migrations', 'name VARCHAR(191) PRIMARY KEY'),
+        );
+        self::assertFalse(Driver::SqlServer->supportsEmulatedPreparesOption());
     }
 
     // --- settings -------------------------------------------------------------
@@ -141,6 +162,11 @@ final class DriverTest extends TestCase
         self::assertSame(
             'pgsql:host=db.internal;port=5433;dbname=orbit',
             DatabaseSettings::postgres('orbit', 'db.internal', 5433)->dsn(),
+        );
+
+        self::assertSame(
+            'sqlsrv:Server=db.internal,1434;Database=orbit;Encrypt=1;TrustServerCertificate=0',
+            DatabaseSettings::sqlServer('orbit', 'db.internal', 1434)->dsn(),
         );
     }
 
@@ -192,6 +218,34 @@ final class DriverTest extends TestCase
         );
     }
 
+    public function test_sql_server_settings_use_the_default_charset_and_port(): void
+    {
+        $settings = DatabaseSettings::fromEnvironment(
+            Environment::fromArray([
+                'DB_DRIVER' => 'sqlserver',
+                'DB_DATABASE' => 'orbit',
+            ]),
+            '/srv/app',
+        );
+
+        self::assertSame(Driver::SqlServer, $settings->driver);
+        self::assertSame('UTF-8', $settings->charset);
+        self::assertSame(
+            'sqlsrv:Server=127.0.0.1,1433;Database=orbit;Encrypt=1;TrustServerCertificate=0',
+            $settings->dsn(),
+        );
+    }
+
+    public function test_server_dsn_values_cannot_inject_additional_options(): void
+    {
+        $settings = DatabaseSettings::sqlServer('orbit;Encrypt=no', 'db.internal');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('DB_DATABASE cannot contain a semicolon');
+
+        $settings->dsn();
+    }
+
     public function test_ports_are_range_checked(): void
     {
         $this->expectExceptionMessageMatches('/DB_PORT must be between/');
@@ -208,13 +262,17 @@ final class DriverTest extends TestCase
 
     public function test_each_engine_gets_its_default_port(): void
     {
-        foreach ([['mysql', 3306], ['pgsql', 5432]] as [$name, $port]) {
+        foreach ([['mysql', 3306], ['pgsql', 5432], ['sqlsrv', 1433]] as [$name, $port]) {
             $settings = DatabaseSettings::fromEnvironment(
                 Environment::fromArray(['DB_DRIVER' => $name, 'DB_DATABASE' => 'orbit']),
                 '/srv/app',
             );
 
-            self::assertStringContainsString('port=' . $port, $settings->dsn(), $name);
+            self::assertStringContainsString(
+                $name === 'sqlsrv' ? ',' . $port : 'port=' . $port,
+                $settings->dsn(),
+                $name,
+            );
         }
     }
 
@@ -234,10 +292,11 @@ final class DriverTest extends TestCase
             ->orderBy('id')
             ->toSql();
 
-        $delimiter = $driver->delimiter();
+        $open = $driver->delimiter();
+        $close = $driver->closingDelimiter();
 
-        self::assertStringContainsString($delimiter . 'title' . $delimiter, $sql);
-        self::assertStringContainsString($delimiter . 'notes' . $delimiter, $sql);
+        self::assertStringContainsString($open . 'title' . $close, $sql);
+        self::assertStringContainsString($open . 'notes' . $close, $sql);
 
         // The value is still bound, on every engine.
         self::assertStringContainsString(':p0', $sql);
@@ -258,11 +317,23 @@ final class DriverTest extends TestCase
             ' LIMIT 18446744073709551615 OFFSET 40',
             $this->queryOn(Driver::MySql)->offset(40)->toSql(),
         );
+        self::assertStringEndsWith(
+            ' ORDER BY (SELECT NULL) OFFSET 40 ROWS',
+            $this->queryOn(Driver::SqlServer)->offset(40)->toSql(),
+        );
 
-        // With an explicit limit, all three agree.
+        // With an explicit limit, MySQL retains its LIMIT/OFFSET form.
         self::assertStringEndsWith(
             ' LIMIT 10 OFFSET 40',
             $this->queryOn(Driver::MySql)->limit(10)->offset(40)->toSql(),
+        );
+        self::assertSame(
+            'SELECT TOP (10) [id], [title] FROM [notes]',
+            $this->queryOn(Driver::SqlServer)->select('id', 'title')->limit(10)->toSql(),
+        );
+        self::assertSame(
+            'SELECT [id] FROM [notes] ORDER BY [id] ASC OFFSET 40 ROWS FETCH NEXT 10 ROWS ONLY',
+            $this->queryOn(Driver::SqlServer)->select('id')->orderBy('id')->limit(10)->offset(40)->toSql(),
         );
     }
 
