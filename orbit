@@ -90,38 +90,66 @@ $parseOptions = static function (array $argv): array {
 $usage = <<<TXT
 phporbit
 
-Usage:
+Commands:
   orbit new <directory> [--demo] [--force]
+      Create a blank project, or a demo project with --demo; --force allows
+      writing into an existing directory.
   orbit key:generate
+      Generate and print a new application key; it does not change any files.
   orbit make:class <Name> [--singleton|--scoped] [--force]
+      Generate an App\ class. Autowired is the default lifetime; the flags
+      register it as a singleton or request-scoped service.
   orbit make:controller <Name> [--view] [--force]
+      Generate a controller and print its route registration; --view also
+      creates a matching template.
   orbit make:form <Name> [--fields=a:text,b:email] [--captcha]
                          [--no-honeypot] [--controllers] [--force]
+      Generate a form with honeypot protection by default. Choose fields,
+      optionally add a captcha or generate its controllers and template.
   orbit make:middleware <Name> [--force]
+      Generate middleware and print its registration; add it to the
+      middleware list yourself to choose its position.
   orbit make:migration <name> [--table=x] [--sequential] [--force]
+      Generate a migration. Filenames use timestamps by default; --sequential
+      uses a numbered prefix, and --table sets the target table.
   orbit make:seed <name> [--force]
+      Generate a database seeder.
   orbit make:model <Name> [--table=x] [--fields=a:string,b:int] [--force]
+      Generate a typed model and its row mappings; --table overrides the
+      inferred table name.
   orbit serve [--host=127.0.0.1] [--port=8080] [--debug]
+      Apply pending migrations and start the development server. --debug
+      enables detailed errors and template recompilation.
   orbit ui [--host=127.0.0.1] [--port=8081] [--debug]
+      Start the local admin dashboard for migrations, mail, routes, seeders,
+      sessions, storage and generators. It has no login.
   orbit routes
+      Print the application's compiled route table.
   orbit migrate
+      Apply all pending database migrations.
   orbit migrate:status
+      Show available migrations and whether each has been applied.
   orbit migrate:rollback [--batches=1]
+      Roll back the most recent batch, or the requested number of batches.
   orbit db:seed [name] [--seed=name]
+      Run all database seeders, or only the named seeder.
   orbit mail:test --to=x@example.test [--from=x@example.test]
+      Send a test message (or queue it when MAIL_QUEUE=true). Uses the
+      configured sender unless --from is provided.
   orbit mail:list [--status=sent|failed|pending] [--limit=20]
+      List logged mail, optionally filtered by status and limited in count.
   orbit mail:send-pending [--limit=50]
+      Deliver queued messages up to the requested limit.
   orbit mail:resend <id>|--failed [--limit=50]
+      Retry one failed message by id, or retry failed messages up to the limit.
   orbit storage:clear
+      Remove compiled templates; they are rebuilt automatically when needed.
   orbit sessions:gc
+      Delete expired session files.
   orbit help
+      Show this command list.
 
-Creating a project:
-  orbit new my-app            a blank application — one route, one controller
-  orbit new my-app --demo     the demo: auth, uploads, notes and the self-check
-
-  Neither includes this documentation; it belongs to the framework, not to
-  every project built on it.
+Scaffolded projects do not include the framework documentation.
 
 TXT;
 
