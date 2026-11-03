@@ -50,7 +50,7 @@ use PhpOrbit\Kernel\Blueprint;
 use PhpOrbit\Log\Level;
 use PhpOrbit\Log\LogRequests;
 use PhpOrbit\Log\Logger;
-use PhpOrbit\Log\StreamLogger;
+use PhpOrbit\Log\LoggerFactory;
 use PhpOrbit\Mail\Mailer;
 use PhpOrbit\Mail\MailerFactory;
 use PhpOrbit\Mail\MailLogRepository;
@@ -102,7 +102,7 @@ final class AdminApplication
         // disconnected copy would show stale numbers and resend mail nobody
         // could find afterwards.
         $database = Connection::connect(DatabaseSettings::fromEnvironment($env, $root));
-        $logger = StreamLogger::standardError(Level::fromName($env->string('LOG_LEVEL', 'info')));
+        $logger = LoggerFactory::fromEnvironment($env, $root);
 
         $templates = new TemplateEngine(
             __DIR__ . '/templates',

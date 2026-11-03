@@ -17,6 +17,10 @@ return [
 APP_DEBUG=false
 APP_URL=http://localhost:8080
 LOG_LEVEL=info
+LOG_OUTPUT=stderr
+LOG_PATH=storage/logs/app.log
+LOG_SERVICE=phporbit
+APP_ENV=production
 
 DB_DATABASE=storage/app.sqlite
 

@@ -28,11 +28,14 @@ final class LogRequests implements Middleware
     public function process(ServerRequest $request, RequestScope $scope, Closure $next): Response
     {
         $started = hrtime(true);
+        $requestId = bin2hex(random_bytes(16));
+        $logger = new ContextLogger($this->logger, ['request_id' => $requestId]);
+        $scope->provide(Logger::class, $logger);
 
         try {
             $response = $next($request);
         } catch (Throwable $e) {
-            $this->logger->log(Level::Error, 'request failed', [
+            $logger->log(Level::Error, 'request failed', [
                 'method' => $request->method->value,
                 'path' => $request->uri->path,
                 'exception' => $e::class,
@@ -42,7 +45,7 @@ final class LogRequests implements Middleware
             throw $e;
         }
 
-        $this->logger->log(
+        $logger->log(
             $response->status->value >= 500 ? Level::Error : Level::Info,
             'request handled',
             [
@@ -53,7 +56,7 @@ final class LogRequests implements Middleware
             ],
         );
 
-        return $response;
+        return $response->withHeader('X-Request-ID', $requestId);
     }
 
     private function elapsedMs(int $startedAt): float

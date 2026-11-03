@@ -105,7 +105,7 @@ src/Auth/         Identity, UserProvider, PasswordHasher, Authenticator, LoginTh
 src/Database/     Connection, Query + Identifier, Model + ModelQuery, Migrator + Migration, TransactionGuard
 src/View/         Compiler, Renderer, TemplateEngine
 src/Validation/   Validator
-src/Log/          Logger, StreamLogger, LogRequests
+src/Log/          Logger, StreamLogger, LoggerFactory, ContextLogger, LogRequests
 src/Mail/         Address, Message, MessageWriter, Mime, SmtpSession, SmtpMailer, ArrayMailer, PersistingMailer + MailLog(Repository)
 src/Crypto/       Key, Encrypter, Signer, CryptoFactory
 src/Form/         Field, Form, Submission, Honeypot, Captcha + MathCaptcha
@@ -135,6 +135,13 @@ Two secrecy rules, both load-bearing:
 Supported syntax is deliberately small: `KEY=value`, `"double quotes"` with escapes and `${VAR}` expansion, `'single quotes'` that are wholly literal, `export` prefixes, `#` comments, and quoted values spanning lines. Expansion runs *before* unescaping so `\${VAR}` stays literal, and an undefined `${VAR}` is an error rather than an empty string — silently expanding a password to nothing fails far from its cause.
 
 ## Request lifecycle
+
+Logging uses `LoggerFactory::fromEnvironment()` in both bootstraps and the admin
+app: JSON lines to `LOG_OUTPUT=stderr|stdout|file`, with fixed service/environment
+context. `LogRequests` publishes an immutable request-local `ContextLogger` under
+`Logger::class` before downstream services resolve it; never capture that wrapper
+in a singleton. The sink redacts sensitive context keys recursively; message text
+is not scrubbed. Nested context is a checked boundary, scalars/null/arrays only.
 
 Routing happens **before** the middleware pipeline, so a layer can see which route matched (how CSRF honours per-route exemptions) while still running for unmatched requests (so logging sees 404s). The matched `Route`, the `RequestScope` and the final `ServerRequest` are published into the scope, which is what makes constructor autowiring work in controllers.
 

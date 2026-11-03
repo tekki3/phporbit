@@ -8,6 +8,8 @@ use PhpOrbit\Log\Level;
 use PhpOrbit\Log\StreamLogger;
 use PHPUnit\Framework\TestCase;
 use ValueError;
+use InvalidArgumentException;
+use RuntimeException;
 
 final class StreamLoggerTest extends TestCase
 {
@@ -63,6 +65,77 @@ final class StreamLoggerTest extends TestCase
         $logger->log(Level::Info, 'bare');
 
         self::assertStringNotContainsString('context', $read());
+    }
+
+    public function test_nested_values_keep_types_and_secrets_are_redacted(): void
+    {
+        [$logger, $read] = $this->logger();
+        $logger->log(Level::Info, 'nested', [
+            'order' => ['id' => 42, 'paid' => true, 'total' => 12.5, 'note' => null, 'items' => ['a', 'b']],
+            'headers' => ['Authorization' => 'Bearer secret', 'Set-Cookie' => ['private']],
+            'credentials' => ['user' => 'private', 'password' => 'private'],
+            'nested' => ['db_password' => 'private', 'clientSecret' => 'private', '_token' => 'private'],
+        ]);
+        $decoded = json_decode($read(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($decoded);
+        self::assertSame([
+            'order' => ['id' => 42, 'paid' => true, 'total' => 12.5, 'note' => null, 'items' => ['a', 'b']],
+            'headers' => ['Authorization' => '[REDACTED]', 'Set-Cookie' => '[REDACTED]'],
+            'credentials' => '[REDACTED]',
+            'nested' => ['db_password' => '[REDACTED]', 'clientSecret' => '[REDACTED]', '_token' => '[REDACTED]'],
+        ], $decoded['context']);
+        self::assertStringNotContainsString('Bearer secret', $read());
+    }
+
+    public function test_bound_context_cannot_be_overwritten_by_a_log_call(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertIsResource($stream);
+        $logger = new StreamLogger($stream, context: ['service' => 'billing', 'password' => 'secret']);
+        $logger->log(Level::Info, 'event', ['service' => 'forged', 'count' => 2]);
+        rewind($stream);
+        $line = stream_get_contents($stream);
+        self::assertIsString($line);
+        self::assertStringContainsString('"service":"billing"', $line);
+        self::assertStringContainsString('"password":"[REDACTED]"', $line);
+        self::assertStringContainsString('"count":2', $line);
+        fclose($stream);
+    }
+
+    public function test_invalid_utf8_does_not_break_request_logging(): void
+    {
+        [$logger, $read] = $this->logger();
+        $logger->log(Level::Info, "invalid \xff\nmessage", ['path' => "/\xff"]);
+        self::assertCount(1, array_filter(explode("\n", $read())));
+        self::assertIsArray(json_decode($read(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
+    public function test_objects_in_nested_context_are_rejected_without_serializing_them(): void
+    {
+        [$logger] = $this->logger();
+        $this->expectException(InvalidArgumentException::class);
+        $logger->log(Level::Info, 'invalid', ['data' => ['object' => new \stdClass()]]);
+    }
+
+    public function test_recursive_context_is_rejected_explicitly(): void
+    {
+        [$logger] = $this->logger();
+        $values = [];
+        $values['self'] = &$values;
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('32 nested array levels');
+        $logger->log(Level::Info, 'recursive', ['data' => $values]);
+    }
+
+    public function test_closed_stream_failure_is_explicit(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertIsResource($stream);
+        $logger = new StreamLogger($stream);
+        fclose($stream);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('closed log stream');
+        $logger->log(Level::Info, 'cannot write');
     }
 
     /**

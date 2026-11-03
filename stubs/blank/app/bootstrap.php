@@ -31,7 +31,7 @@ use PhpOrbit\Kernel\Blueprint;
 use PhpOrbit\Log\Level;
 use PhpOrbit\Log\LogRequests;
 use PhpOrbit\Log\Logger;
-use PhpOrbit\Log\StreamLogger;
+use PhpOrbit\Log\LoggerFactory;
 use PhpOrbit\Mail\Mailer;
 use PhpOrbit\Mail\MailerFactory;
 use PhpOrbit\Mail\MailLogRepository;
@@ -70,9 +70,8 @@ return Application::boot(
         // process, never a per-request value cached statically.
         Model::useConnection($database);
 
-        // Not the STDERR constant: it exists only under the CLI SAPI, so using
-        // it here would fatal at boot under FPM, Apache and php -S.
-        $logger = StreamLogger::standardError(Level::fromName($env->string('LOG_LEVEL', 'info')));
+        // Stream wrappers work on every SAPI; CLI-only constants do not.
+        $logger = LoggerFactory::fromEnvironment($env, $root);
 
         $templates = new TemplateEngine(
             $root . '/app/templates',
