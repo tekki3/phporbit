@@ -39,5 +39,13 @@
 
         <button type="submit">Sign in</button>
     </form>
+    <p><a href="/password/forgot">Forgot your password?</a> &middot; <a href="/magic">Sign in with an email link</a></p>
+    @foreach($providers as $provider)
+        <form method="post" action="/auth/{{ $provider }}/start" class="card">
+            <input type="hidden" name="_token" value="{{ $csrfToken }}">
+            <button type="submit">Sign in with @if($provider === 'google')Google@else Microsoft Entra ID@endif</button>
+        </form>
+    @endforeach
+    @if($providers)<p class="note">External accounts must first be linked from Account security after signing in with your password.</p>@endif
 </div>
 @endsection

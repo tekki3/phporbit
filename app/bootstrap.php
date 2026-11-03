@@ -23,10 +23,18 @@ use App\Controllers\StoreAvatarController;
 use App\Middleware\HtmlErrorPages;
 use App\Support\ScopedProbe;
 use App\Support\WorkerStats;
+use App\Support\AuthEmails;
 use PhpOrbit\Auth\Authenticator;
 use PhpOrbit\Auth\LoginThrottle;
 use PhpOrbit\Auth\PasswordHasher;
 use PhpOrbit\Auth\UserProvider;
+use PhpOrbit\Auth\Identity;
+use PhpOrbit\Auth\SecurityState;
+use PhpOrbit\Auth\Mfa;
+use PhpOrbit\Auth\EmailTokens;
+use PhpOrbit\Auth\Oidc\OidcProviders;
+use PhpOrbit\Auth\Oidc\OidcHttp;
+use PhpOrbit\Auth\Oidc\CurlOidcHttp;
 use PhpOrbit\Cache\Cache;
 use PhpOrbit\Cache\CacheFactory;
 use PhpOrbit\Config\Environment;
@@ -158,6 +166,23 @@ return Application::boot(
         // Interfaces can never be autowired, so the binding is explicit.
         $app->container->singleton(UserProvider::class, static fn (): UserProvider => $users);
         $app->container->singleton(DatabaseUserProvider::class, static fn (): DatabaseUserProvider => $users);
+        $securityState = new SecurityState($database);
+        $providers = OidcProviders::fromEnvironment($env);
+        $app->container->singleton(SecurityState::class, static fn (): SecurityState => $securityState);
+        $app->container->singleton(OidcProviders::class, static fn (): OidcProviders => $providers);
+        $app->container->singleton(OidcHttp::class, static fn (): OidcHttp => new CurlOidcHttp());
+        $app->container->singleton(Mfa::class, static fn (): Mfa => new Mfa(
+            $database, $securityState, static fn (): Encrypter => CryptoFactory::encrypterFromEnvironment($env),
+        ));
+        $app->container->scoped(Authenticator::class, static fn (RequestScope $scope): Authenticator => new Authenticator(
+            $scope->get(Session::class), $users, $hasher,
+            static fn (Identity $user): string => hash('sha256', $user->passwordHash() . ':' . $securityState->version($user->authIdentifier())),
+        ));
+        // Login links must not enter the ordinary, readable mail audit/queue.
+        $app->container->scoped(AuthEmails::class, static fn (RequestScope $scope): AuthEmails => new AuthEmails(
+            $scope->get(EmailTokens::class), $users, $scope->get(LoginThrottle::class),
+            MailerFactory::fromEnvironment($env), $env, $logger,
+        ));
         $app->container->singleton(
             LoginThrottle::class,
             static fn (): LoginThrottle => new LoginThrottle(

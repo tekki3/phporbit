@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Authentication — phporbit</title>
-<meta name="description" content="Signing users in and out, password hashing, guarding routes, and throttling brute force.">
+<meta name="description" content="Sessions, MFA/TOTP, password resets, magic links and linked Google/Microsoft Entra ID sign-in.">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/docs.css">
 </head>
@@ -20,14 +20,14 @@
         </picture>
     </a>
     <p class="tagline">Developer documentation</p>
-    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li><li><a href="models.html">Models</a></li><li><a href="caching.html">Caching</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html" class="current" aria-current="page">Authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
+    <nav aria-label="Documentation"><p class="nav-group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="configuration.html">Configuration</a></li></ul><p class="nav-group">Handling requests</p><ul><li><a href="routing.html">Routing</a></li><li><a href="controllers.html">Controllers</a></li><li><a href="requests.html">Requests</a></li><li><a href="responses.html">Responses</a></li><li><a href="forms.html">Forms</a></li></ul><p class="nav-group">Building blocks</p><ul><li><a href="container.html">Container</a></li><li><a href="middleware.html">Middleware</a></li><li><a href="templates.html">Templates</a></li></ul><p class="nav-group">Data</p><ul><li><a href="database.html">Database</a></li><li><a href="queries.html">Query builder</a></li><li><a href="migrations.html">Migrations</a></li><li><a href="models.html">Models</a></li><li><a href="caching.html">Caching</a></li></ul><p class="nav-group">Users and safety</p><ul><li><a href="security.html">Security</a></li><li><a href="sessions.html">Sessions</a></li><li><a href="auth.html" class="current" aria-current="page">Authentication</a></li><li><a href="advanced-auth.html">Advanced authentication</a></li><li><a href="validation.html">Validation</a></li><li><a href="uploads.html">File uploads</a></li><li><a href="encryption.html">Encryption and signing</a></li></ul><p class="nav-group">Talking outward</p><ul><li><a href="mail.html">Sending email</a></li></ul><p class="nav-group">Operating it</p><ul><li><a href="cli.html">The orbit CLI</a></li><li><a href="admin-ui.html">The admin UI</a></li><li><a href="logging.html">Logging</a></li><li><a href="testing.html">Testing</a></li><li><a href="deployment.html">Deployment</a></li></ul></nav>
 </aside>
 
 <main id="content">
     <article>
         <h1>Authentication</h1>
-        <p class="summary">Signing users in and out, password hashing, guarding routes, and throttling brute force.</p>
-        <p>Four pieces: an <code>Identity</code> (your user), a <code>UserProvider</code> (how to find one), a <code>PasswordHasher</code>, and an <code>Authenticator</code> that ties them to the session.</p>
+        <p class="summary">Sessions, MFA/TOTP, password resets, magic links and linked Google/Microsoft Entra ID sign-in.</p>
+        <p>Four basic pieces: an <code>Identity</code> (your user), a <code>UserProvider</code> (how to find one), a <code>PasswordHasher</code>, and an <code>Authenticator</code> that ties them to the session. For MFA, email links and external sign-in, see <a href="advanced-auth.html">Advanced authentication</a>. The demo already wires those flows together at <code>/login</code> and <code>/account/security</code>.</p>
 
 <h2>Your user</h2>
 
@@ -166,7 +166,8 @@
 <span class="tk-var">$auth</span>-&gt;<span class="tk-fn">login</span><span class="tk-p">(</span><span class="tk-var">$user</span><span class="tk-p">)</span><span class="tk-p">;</span>                 <span class="tk-comment">// sign in an Identity you already have</span>
 <span class="tk-var">$auth</span>-&gt;<span class="tk-fn">logout</span><span class="tk-p">(</span><span class="tk-p">)</span><span class="tk-p">;</span>                     <span class="tk-comment">// sign out</span></code></pre></figure>
 
-<p>Only the identifier goes into the session; the user is loaded per request. A deactivated or deleted account therefore loses access on its very next request, rather than whenever the session happens to expire.</p>
+<p>By default only the identifier goes into the session; the user is loaded per request. Deleted accounts lose access on their next request. The optional fourth constructor argument computes a security stamp: the demo combines the password hash and <code>SecurityState::version()</code>, so resetting a password or revoking security state also ends existing sessions. Register this factory explicitly on <code>RequestScope</code>.</p>
+<div class="warn"><b>MFA-aware sign-in</b><p><code>attempt()</code> is the basic, password-only operation. With MFA enabled, use <code>validateCredentials()</code> to obtain an identity without signing in, then <code>LoginFlow::begin()</code>. Never call <code>attempt()</code> or <code>login()</code> directly from an MFA-enabled login controller. <code>login()</code> is a trusted final step, not a second-factor check.</p></div>
 
 <h2>Guarding routes</h2>
 
@@ -266,11 +267,11 @@
 
 <p>Sign-out is a <code>POST</code>, not a link — a <code>GET</code> logout can be triggered by any image tag on any page.</p>
 
-<h2>Not included</h2>
+<h2>Additional sign-in methods</h2>
 
-<p>Registration, password reset and email are yours to write; they need decisions about verification and delivery that a framework should not make for you. The pieces above are what they build on: hash with <code>PasswordHasher</code>, store through your provider, and call <code>login()</code> when the user is confirmed.</p>
+<p><a href="advanced-auth.html">Advanced authentication</a> covers TOTP and recovery codes, password reset, magic links, OAuth 2.0/OpenID Connect, Google and Microsoft Entra ID, including migration and mail setup. Registration and automatic provisioning are deliberately not included.</p>
     </article>
-    <nav class="pager"><a href="sessions.html"><span>Previous</span>Sessions</a><a class="next" href="validation.html"><span>Next</span>Validation</a></nav>
+    <nav class="pager"><a href="sessions.html"><span>Previous</span>Sessions</a><a class="next" href="advanced-auth.html"><span>Next</span>Advanced authentication</a></nav>
     <footer class="site-footer">
         <p>phporbit documentation · generated by <code>php docs/build.php</code></p>
     </footer>

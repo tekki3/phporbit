@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpOrbit\Auth;
 
+use Closure;
+use SensitiveParameter;
 use PhpOrbit\Security\Csrf;
 use PhpOrbit\Session\Session;
 
@@ -13,8 +15,8 @@ use PhpOrbit\Session\Session;
  * Request-scoped: it holds the resolved user, which must never be shared
  * between requests in a worker.
  *
- * The session stores only the identifier. The user is re-fetched from the
- * provider on each request so that a deactivated or deleted account loses
+ * The session stores the identifier and an optional security stamp. The user
+ * is re-fetched from the provider on each request so a deactivated or deleted account loses
  * access immediately, rather than as far in the future as their session
  * happens to last.
  */
@@ -26,11 +28,17 @@ final class Authenticator
 
     private bool $resolved = false;
 
+    /** @var (Closure(Identity): string)|null */
+    private readonly ?Closure $sessionStamp;
+
+    /** @param (callable(Identity): string)|null $sessionStamp */
     public function __construct(
         private readonly Session $session,
         private readonly UserProvider $users,
         private readonly PasswordHasher $hasher,
+        ?callable $sessionStamp = null,
     ) {
+        $this->sessionStamp = $sessionStamp === null ? null : Closure::fromCallable($sessionStamp);
     }
 
     public function check(): bool
@@ -59,6 +67,11 @@ final class Authenticator
 
         $this->user = $this->users->findByIdentifier($identifier);
 
+        if ($this->user !== null && $this->sessionStamp !== null
+            && !hash_equals(($this->sessionStamp)($this->user), $this->session->get('_auth_stamp') ?? '')) {
+            $this->user = null;
+        }
+
         // The session named someone who no longer exists; drop the claim so
         // later requests stop paying for the lookup.
         if ($this->user === null) {
@@ -74,29 +87,41 @@ final class Authenticator
      * A failed lookup still runs a hash verification, so the response time
      * does not reveal whether the address is registered.
      */
-    public function attempt(string $email, string $password): bool
+    public function attempt(string $email, #[SensitiveParameter] string $password): bool
+    {
+        $user = $this->validateCredentials($email, $password);
+        if ($user === null) {
+            return false;
+        }
+        $this->login($user);
+
+        return true;
+    }
+
+    /** Verifies the primary factor without granting a session (for LoginFlow). */
+    public function validateCredentials(string $email, #[SensitiveParameter] string $password): ?Identity
     {
         $user = $this->users->findByEmail($email);
 
         if ($user === null) {
             $this->hasher->dummyVerify($password);
 
-            return false;
+            return null;
         }
 
         if (!$this->hasher->verify($password, $user->passwordHash())) {
-            return false;
+            return null;
         }
 
         // The stored hash predates the current cost settings; now is the only
         // moment the plaintext is available to upgrade it.
         if ($this->hasher->needsRehash($user->passwordHash())) {
             $this->users->updatePasswordHash($user, $this->hasher->hash($password));
+
+            return $this->users->findByIdentifier($user->authIdentifier());
         }
 
-        $this->login($user);
-
-        return true;
+        return $user;
     }
 
     /**
@@ -113,6 +138,9 @@ final class Authenticator
         Csrf::rotate($this->session);
 
         $this->session->set(self::SESSION_KEY, $user->authIdentifier());
+        if ($this->sessionStamp !== null) {
+            $this->session->set('_auth_stamp', ($this->sessionStamp)($user));
+        }
 
         $this->user = $user;
         $this->resolved = true;

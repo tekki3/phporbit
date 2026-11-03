@@ -5,9 +5,9 @@ declare(strict_types=1);
 return [
     'slug' => 'auth',
     'title' => 'Authentication',
-    'summary' => 'Signing users in and out, password hashing, guarding routes, and throttling brute force.',
+    'summary' => 'Sessions, MFA/TOTP, password resets, magic links and linked Google/Microsoft Entra ID sign-in.',
     'body' => <<<'HTML'
-<p>Four pieces: an <code>Identity</code> (your user), a <code>UserProvider</code> (how to find one), a <code>PasswordHasher</code>, and an <code>Authenticator</code> that ties them to the session.</p>
+<p>Four basic pieces: an <code>Identity</code> (your user), a <code>UserProvider</code> (how to find one), a <code>PasswordHasher</code>, and an <code>Authenticator</code> that ties them to the session. For MFA, email links and external sign-in, see <a href="advanced-auth.html">Advanced authentication</a>. The demo already wires those flows together at <code>/login</code> and <code>/account/security</code>.</p>
 
 <h2>Your user</h2>
 
@@ -154,7 +154,8 @@ $auth->login($user);                 // sign in an Identity you already have
 $auth->logout();                     // sign out
 [[/php]]
 
-<p>Only the identifier goes into the session; the user is loaded per request. A deactivated or deleted account therefore loses access on its very next request, rather than whenever the session happens to expire.</p>
+<p>By default only the identifier goes into the session; the user is loaded per request. Deleted accounts lose access on their next request. The optional fourth constructor argument computes a security stamp: the demo combines the password hash and <code>SecurityState::version()</code>, so resetting a password or revoking security state also ends existing sessions. Register this factory explicitly on <code>RequestScope</code>.</p>
+<div class="warn"><b>MFA-aware sign-in</b><p><code>attempt()</code> is the basic, password-only operation. With MFA enabled, use <code>validateCredentials()</code> to obtain an identity without signing in, then <code>LoginFlow::begin()</code>. Never call <code>attempt()</code> or <code>login()</code> directly from an MFA-enabled login controller. <code>login()</code> is a trusted final step, not a second-factor check.</p></div>
 
 <h2>Guarding routes</h2>
 
@@ -268,8 +269,8 @@ Application::boot(static function (Blueprint $app) use ($env): void {
 
 <p>Sign-out is a <code>POST</code>, not a link — a <code>GET</code> logout can be triggered by any image tag on any page.</p>
 
-<h2>Not included</h2>
+<h2>Additional sign-in methods</h2>
 
-<p>Registration, password reset and email are yours to write; they need decisions about verification and delivery that a framework should not make for you. The pieces above are what they build on: hash with <code>PasswordHasher</code>, store through your provider, and call <code>login()</code> when the user is confirmed.</p>
+<p><a href="advanced-auth.html">Advanced authentication</a> covers TOTP and recovery codes, password reset, magic links, OAuth 2.0/OpenID Connect, Google and Microsoft Entra ID, including migration and mail setup. Registration and automatic provisioning are deliberately not included.</p>
 HTML,
 ];

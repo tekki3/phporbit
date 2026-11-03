@@ -181,6 +181,8 @@ Visit <http://127.0.0.1:8080> for the demo self-check page, and
 - [Database](docs/database.html), [migrations](docs/migrations.html) and
   [models](docs/models.html) — storing and retrieving data
 - [Caching](docs/caching.html) — file storage, Redis and Memcached through one API
+- [Advanced authentication](docs/advanced-auth.html) — TOTP/recovery codes,
+  password resets, magic links, and explicitly linked Google/Entra accounts
 - [Documentation overview](docs/index.html) — all framework topics
 - [Deployment](docs/deployment.html) — production setup
 

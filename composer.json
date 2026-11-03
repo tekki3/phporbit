@@ -20,7 +20,8 @@
         }
     ],
     "require": {
-        "php": ">=8.3"
+        "php": ">=8.3",
+        "firebase/php-jwt": "^7.2"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.1",
@@ -41,6 +42,7 @@
         "orbit"
     ],
     "suggest": {
+        "ext-curl": "Required for Google, Microsoft Entra ID and other OpenID Connect logins.",
         "ext-memcached": "Required for CACHE_DRIVER=memcached.",
         "ext-redis": "Required for CACHE_DRIVER=redis."
     },

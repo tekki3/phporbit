@@ -37,7 +37,7 @@ const NAV = [
     'Handling requests' => ['routing', 'controllers', 'requests', 'responses', 'forms'],
     'Building blocks' => ['container', 'middleware', 'templates'],
     'Data' => ['database', 'queries', 'migrations', 'models', 'caching'],
-    'Users and safety' => ['security', 'sessions', 'auth', 'validation', 'uploads', 'encryption'],
+    'Users and safety' => ['security', 'sessions', 'auth', 'advanced-auth', 'validation', 'uploads', 'encryption'],
     'Talking outward' => ['mail'],
     'Operating it' => ['cli', 'admin-ui', 'logging', 'testing', 'deployment'],
 ];

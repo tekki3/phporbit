@@ -47,9 +47,27 @@ final class RoutesFileTest extends TestCase
             'login',
             'login.attempt',
             'logout',
+            'magic',
+            'magic.confirm',
+            'magic.email',
+            'magic.login',
+            'mfa',
+            'mfa.disable',
+            'mfa.enable',
+            'mfa.enroll',
+            'mfa.verify',
             'notes.create',
             'notes.delete',
             'notes.index',
+            'oidc.callback',
+            'oidc.link',
+            'oidc.start',
+            'oidc.unlink',
+            'password.email',
+            'password.forgot',
+            'password.reset',
+            'password.update',
+            'security',
             'self-check',
         ], $names);
     }
@@ -60,7 +78,10 @@ final class RoutesFileTest extends TestCase
      */
     public function test_write_routes_require_authentication(): void
     {
-        $guarded = ['notes.create', 'notes.delete', 'avatar', 'avatar.store'];
+        $guarded = [
+            'notes.create', 'notes.delete', 'avatar', 'avatar.store', 'security',
+            'mfa.enroll', 'mfa.enable', 'mfa.disable', 'oidc.link', 'oidc.unlink',
+        ];
 
         foreach ($guarded as $name) {
             self::assertTrue(

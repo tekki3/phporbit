@@ -53,6 +53,7 @@
         @endif
 
         @if(($currentUser ?? null) !== null)
+            <a href="/account/security" @if(($currentPath ?? '') === '/account/security') class="current" aria-current="page" @endif>Security</a>
             <a href="/avatar" @if(($currentPath ?? '') === '/avatar') class="current" aria-current="page" @endif>Avatar</a>
             <span class="who">{{ $currentUser->displayName }}</span>
             <form method="post" action="/logout" class="inline">

@@ -55,6 +55,18 @@ return static function (RouteCollection $routes, bool $debug): void {
     $routes->get('/login', LoginController::class, 'login');
     $routes->post('/login', LoginAttemptController::class, 'login.attempt');
     $routes->post('/logout', LogoutController::class, 'logout');
+    $routes->get('/password/forgot', App\Controllers\PasswordForgotController::class, 'password.forgot');
+    $routes->post('/password/forgot', App\Controllers\PasswordEmailController::class, 'password.email');
+    $routes->get('/password/reset', App\Controllers\PasswordResetController::class, 'password.reset');
+    $routes->post('/password/reset', App\Controllers\PasswordUpdateController::class, 'password.update');
+    $routes->get('/magic', App\Controllers\MagicLinkController::class, 'magic');
+    $routes->post('/magic', App\Controllers\MagicEmailController::class, 'magic.email');
+    $routes->get('/magic/confirm', App\Controllers\MagicConfirmController::class, 'magic.confirm');
+    $routes->post('/magic/confirm', App\Controllers\MagicLoginController::class, 'magic.login');
+    $routes->get('/mfa', App\Controllers\MfaChallengeController::class, 'mfa');
+    $routes->post('/mfa', App\Controllers\MfaVerifyController::class, 'mfa.verify');
+    $routes->post('/auth/{provider}/start', App\Controllers\OidcStartController::class, 'oidc.start');
+    $routes->get('/auth/{provider}/callback', App\Controllers\OidcCallbackController::class, 'oidc.callback');
 
     // ------------------------------------------------------- requires a user
     // Stated once for the whole block. A guard repeated on each line is a
@@ -66,6 +78,12 @@ return static function (RouteCollection $routes, bool $debug): void {
 
         $routes->get('/avatar', AvatarController::class, 'avatar');
         $routes->post('/avatar', StoreAvatarController::class, 'avatar.store');
+        $routes->get('/account/security', App\Controllers\SecurityController::class, 'security');
+        $routes->post('/account/mfa/enroll', App\Controllers\MfaEnrollController::class, 'mfa.enroll');
+        $routes->post('/account/mfa/enable', App\Controllers\MfaEnableController::class, 'mfa.enable');
+        $routes->post('/account/mfa/disable', App\Controllers\MfaDisableController::class, 'mfa.disable');
+        $routes->post('/account/link/{provider}', App\Controllers\OidcLinkController::class, 'oidc.link');
+        $routes->post('/account/unlink/{id:\d+}', App\Controllers\OidcUnlinkController::class, 'oidc.unlink');
     });
 
     // ----------------------------------------------------------- debug only

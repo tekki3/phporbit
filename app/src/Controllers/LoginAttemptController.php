@@ -6,7 +6,8 @@ namespace App\Controllers;
 
 use PhpOrbit\Auth\Authenticator;
 use PhpOrbit\Auth\LoginThrottle;
-use PhpOrbit\Auth\RequireAuthentication;
+use PhpOrbit\Auth\LoginFlow;
+use App\Support\AuthPage;
 use PhpOrbit\Http\Response;
 use PhpOrbit\Http\ServerRequest;
 use PhpOrbit\Session\Session;
@@ -26,6 +27,8 @@ final class LoginAttemptController implements Handler
         private readonly Authenticator $auth,
         private readonly LoginThrottle $throttle,
         private readonly Session $session,
+        private readonly LoginFlow $flow,
+        private readonly AuthPage $page,
     ) {
     }
 
@@ -42,7 +45,7 @@ final class LoginAttemptController implements Handler
             return $this->back(implode(' ', $validator->errors()), $email);
         }
 
-        $key = $this->throttleKey($request, $email);
+        $key = $this->throttleKey($email);
 
         if ($this->throttle->tooManyAttempts($key)) {
             return $this->back(sprintf(
@@ -51,36 +54,25 @@ final class LoginAttemptController implements Handler
             ), $email);
         }
 
-        if (!$this->auth->attempt($email, $validator->validated('password'))) {
-            $this->throttle->record($key);
+        $this->throttle->record($key);
+        $user = $this->auth->validateCredentials($email, $request->form('password') ?? '');
+        if ($user === null) {
 
             return $this->back('Those credentials do not match our records.', $email);
         }
 
         $this->throttle->clear($key);
+        $this->flow->begin($user);
 
-        // attempt() regenerated the session, so anything written before this
-        // point belongs to the pre-login session and is gone.
-        $this->session->flash('notice', 'Signed in.');
-
-        $intended = $this->session->get(RequireAuthentication::INTENDED_KEY);
-        $this->session->remove(RequireAuthentication::INTENDED_KEY);
-
-        // Only ever redirect to a path of our own; an absolute URL here would
-        // be an open redirect.
-        $destination = $intended !== null && str_starts_with($intended, '/') && !str_starts_with($intended, '//')
-            ? $intended
-            : '/notes';
-
-        return Response::redirect($destination);
+        return $this->flow->pending() ? Response::redirect('/mfa') : $this->page->signedIn();
     }
 
     /**
-     * Keys the throttle on the account *and* the caller.
+     * Account-wide so changing clients or spoofing forwarding headers cannot reset it.
      */
-    private function throttleKey(ServerRequest $request, string $email): string
+    private function throttleKey(string $email): string
     {
-        return mb_strtolower($email) . '|' . ($request->headers->first('X-Forwarded-For') ?? 'local');
+        return 'password:' . mb_strtolower($email);
     }
 
     private function back(string $error, string $email): Response

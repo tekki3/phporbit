@@ -409,3 +409,18 @@ button.link:hover { color: var(--fail); filter: none; }
 .field .hint { color: var(--muted); font-size: .82rem; }
 .field .error { color: var(--fail); font-size: .85rem; font-weight: 500; }
 .field [aria-invalid="true"] { border-color: var(--fail); }
+.auth-secret {
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.auth-identity {
+    overflow-wrap: anywhere;
+}
+
+.recovery-codes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: .75rem 2rem;
+    padding-inline-start: 1.5rem;
+}

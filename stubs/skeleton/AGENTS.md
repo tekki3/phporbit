@@ -106,6 +106,15 @@ data; `orbit storage:clear` still clears templates only.
 
 ## Mail
 
+Demo projects include `/account/security`: optional TOTP/recovery codes,
+password reset, magic links, and explicitly linked Google/Entra login.
+Use scoped `LoginFlow` after every primary factor, never password-only
+`Authenticator::attempt()` when MFA is enabled. Keep the stamped Authenticator
+factory so resets and security changes invalidate old sessions. External
+identities never auto-link by email; Entra tenants are explicitly allowlisted.
+Authentication emails bypass the readable mail audit/queue and require SMTP.
+Blank projects do not install authentication routes or schemas automatically.
+
 `Message::to(...)->subject(...)->text(...)`, sent through the injected `Mailer`.
 CR/LF in a subject, display name or address is refused — that is header
 injection, and subjects are usually user-supplied. `MAIL_DRIVER=array` (the

@@ -214,6 +214,30 @@ See `docs/pages/29-caching.php`, `tests/Unit/Cache`, `tests/Worker/CacheTest.php
 and `tests/Integration/CacheTest.php`. Live cache tests use REDIS_HOST/PORT and
 MEMCACHED_HOST/PORT and require ext-redis/ext-memcached respectively.
 
+## Advanced authentication
+
+The demo wires `LoginFlow` for password, magic-link and OAuth/OIDC sign-in:
+`Authenticator::validateCredentials()` checks only the primary factor, and
+`LoginFlow::begin()` grants access only when no TOTP factor is enrolled.
+Otherwise a five-minute, version-bound challenge must complete first.
+`Authenticator::attempt()` remains password-only; never use it in these flows.
+
+`Mfa` encrypts secrets with per-user context and atomically consumes TOTP steps
+or hashed recovery codes. `SecurityMigration` supplies the four security tables.
+`PasswordReset` consumes purpose-bound `EmailTokens` transactionally, changes the
+password and revokes sessions/links without disabling MFA. The demo stamps
+sessions with the password hash and `SecurityState` version; keep that explicit
+scoped Authenticator factory. `AuthEmails` deliberately uses the raw mail driver,
+not `PersistingMailer`: usable reset/login tokens must not enter the readable
+mail audit or queue. SMTP is required for delivery.
+
+`OidcClient` implements authorization code + PKCE, state and nonce with
+`firebase/php-jwt` signature verification and fixed HTTPS provider endpoints.
+External identities are `(provider, issuer, subject)`, never an email match.
+Only password/MFA-confirmed account management can link or unlink identities.
+Entra uses an explicit tenant UUID allowlist. All request state stays in the
+request session; never singleton-bind `LoginFlow` or `OidcClient`.
+
 ## Forms
 
 `Form\Form` renders a form and checks its submissions from **one declaration** — `Field::email('email')->required()` yields both the attribute and the rule. Declaring them separately is the ordinary way a field ends up unvalidated. Forms and fields are immutable, so one may be built at boot and rendered per request; the demo's `/contact` defines it in `App\Support\ContactForm` so the render and submit controllers cannot disagree.
@@ -413,6 +437,6 @@ The demo site uses them: the lockup in the masthead, the mark on the sign-in pag
 - **Array-style file inputs** (`name="photos[]"`) — `FpmSapi` skips them rather than half-supporting PHP's transposed `$_FILES` arrays.
 - **Streaming uploads in the built-in server** — the body is decoded from memory, bounding upload size there. Production targets stream to disk before PHP sees the request.
 - **Chunked transfer encoding** in `RequestParser` — rejected with a clear 400.
-- **Registration, password reset, email** — the demo seeds its account via `./orbit db:seed`.
+- **Registration and automatic external-account provisioning** — accounts are seeded via `./orbit db:seed`; external identities must be explicitly linked.
 - **Joins/aggregates in the query builder** — deliberately thin; `Connection::select()` with hand-written SQL is the escape hatch and the better tool for anything complex.
 - **Concurrency in `OrbitServer`** — connections are served sequentially. Deliberate for a dev server, and the reason it is not a production target.

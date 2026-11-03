@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use PhpOrbit\Auth\Authenticator;
+use PhpOrbit\Auth\Oidc\OidcProviders;
 use PhpOrbit\Http\Response;
 use PhpOrbit\Http\ServerRequest;
 use PhpOrbit\Routing\Handler;
@@ -18,6 +19,7 @@ final class LoginController implements Handler
         private readonly TemplateEngine $view,
         private readonly Session $session,
         private readonly Authenticator $auth,
+        private readonly OidcProviders $providers,
     ) {
     }
 
@@ -35,6 +37,7 @@ final class LoginController implements Handler
             'error' => $this->session->takeFlash('error'),
             'notice' => $this->session->takeFlash('notice'),
             'oldEmail' => $this->session->takeFlash('old_email') ?? '',
-        ]);
+            'providers' => $this->providers->names(),
+        ])->withHeader('Cache-Control', 'no-store');
     }
 }
