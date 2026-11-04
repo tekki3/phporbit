@@ -48,7 +48,7 @@ final class ApiDefinition
             'responses' => ['204' => ['description' => 'Token revoked'], '401' => $problem, '429' => $problem],
         ]);
 
-        return $api->document();
+        return \PhpOrbit\Api\RouteFiles::document(dirname(__DIR__, 2) . '/api', $api->document());
     }
 
     public static function document(): OpenApi

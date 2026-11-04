@@ -224,6 +224,7 @@ final class AdminApplication
 
         $routes = new RouteCollection();
         $define($routes, $debug);
+        \PhpOrbit\Api\RouteFiles::register($routes, dirname($path) . '/api');
 
         return $routes->compile()->routes();
     }

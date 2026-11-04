@@ -56,6 +56,11 @@ the `app/bootstrap.php` line to paste.
 - Routes live in `app/routes.php`, declared on `$routes`. Run `./orbit routes` to
   see the compiled table.
 - Generate rather than hand-write: `./orbit make:controller Admin/Users --view`.
+- `./orbit make:api Products` generates a JSON controller and an automatically
+  loaded `app/api/v1/*.php` declaration, also included in Swagger. Bearer auth
+  is the default (`make:auth` supplies it); `--public` explicitly opts out.
+  Run migrations and restart workers. Never duplicate its registration in
+  `app/routes.php`.
 
 ## Templates
 

@@ -372,6 +372,16 @@ Convention over configuration, minimum ceremony between install and a route retu
 
 ## Code generation (`orbit make:*`)
 
+`Console\ApiMaker` writes one JSON controller and an editable declaration under
+`app/api/vN/`. `Blueprint::loadRoutes()` discovers those files when loading
+`app/routes.php` (not module route files), before compilation and freeze.
+`Api\RouteFiles` also feeds the CLI/admin route list and OpenAPI. This is
+automatic registration by convention, not a rewrite of developer-owned PHP.
+Bearer protection and shared rate limiting remain defaults; `--public` opts out
+of authentication only. Swagger assets and the API migration are installed when
+needed. `AuthMaker` reuses that migration/assets when authentication is added
+later, avoiding duplicate schema. Preserve both command entrypoints.
+
 `Console\AuthMaker` assembles an editable auth module from `stubs/auth/` plus
 the demo's existing MFA/email/OIDC flows, adapted into `App\AuthKit`. It
 preflights all paths, refuses symlinks/collisions and has no overwrite flag.

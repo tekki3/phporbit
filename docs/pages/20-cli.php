@@ -15,6 +15,7 @@ Usage:
   orbit new <directory> [--demo] [--force]
   orbit key:generate
   orbit make:auth
+  orbit make:api <Name> [--method=GET] [--version=1] [--public]
   orbit auth:admin <email>
   orbit make:class <Name> [--singleton|--scoped] [--force]
   orbit make:controller <Name> [--view] [--force]
@@ -40,6 +41,16 @@ Usage:
   orbit sessions:gc
   orbit help
 [[/bash]]
+
+<h2>make:api</h2>
+<p>Generates a single JSON endpoint with automatic route registration and OpenAPI documentation. No code needs to be pasted into <code>app/routes.php</code>. Bearer authentication is required unless <code>--public</code> is explicitly supplied.</p>
+[[bash]]
+php orbit make:api Products
+php orbit make:api Ping --public
+php orbit make:api CreateProduct --method=POST --version=2
+php orbit migrate
+[[/bash]]
+<p>Edit the generated controller and its <code>app/api/vN/*.php</code> declaration, restart the server, and open <code>/api/docs</code>. GET is the default; POST, PUT, PATCH and DELETE are also supported. Existing files are never overwritten. For protected endpoints in a blank project, run <code>make:auth</code> once to provide token authentication. Public endpoints work without it. See <a href="api.html">APIs</a> for setup and examples.</p>
 
 <h2>new</h2>
 

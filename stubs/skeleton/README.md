@@ -128,6 +128,22 @@ does not include a `/docs` route.
 
 ## Commands
 
+### Create an API endpoint
+
+```bash
+php orbit make:api Products
+php orbit make:api Ping --public
+php orbit make:api CreateProduct --method=POST --version=2
+php orbit migrate
+```
+
+Routes and OpenAPI descriptions are registered automatically from
+`app/api/vN/*.php`; no code needs to be pasted into your route file. Edit the
+generated JSON controller, restart the server and open `/api/docs`.
+Endpoints require Bearer authentication by default: install `make:auth` once
+in a blank project, or provide your own token services. `--public` endpoints
+work without authentication setup. Existing files are never overwritten.
+
 ### Optional authentication
 
 In a blank project, run `php orbit make:auth` to generate login, registration

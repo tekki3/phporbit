@@ -92,9 +92,24 @@ final class AuthMaker
         $files['public/assets/js/swagger.js'] = $this->read($framework . '/public/assets/js/swagger.js');
         $files['public/assets/css/swagger-shell.css'] = $this->read($framework . '/public/assets/css/swagger-shell.css');
         $migration = $files['database/migrations/create_auth_kit.php'];
+        if ((glob($this->root . '/database/migrations/*_create_api.php') ?: []) !== []) {
+            $migration = str_replace([
+                "use PhpOrbit\\Api\\ApiMigration;\n",
+                "        (new ApiMigration())->up(\$database);\n",
+                "        (new ApiMigration())->down(\$database);\n",
+            ], '', $migration);
+        }
         unset($files['database/migrations/create_auth_kit.php']);
         $files['database/migrations/' . gmdate('YmdHis') . '_create_auth_kit.php'] = $migration;
 
+        foreach ($files as $relative => $contents) {
+            if ((str_starts_with($relative, 'public/assets/swagger/') || in_array($relative, [
+                'public/assets/js/swagger.js', 'public/assets/css/swagger-shell.css',
+            ], true)) && is_file($this->root . '/' . $relative) && !is_link($this->root . '/' . $relative)
+                && file_get_contents($this->root . '/' . $relative) === $contents) {
+                unset($files[$relative]);
+            }
+        }
         foreach (array_keys($files) as $relative) {
             $path = $this->root . '/' . $relative;
             if (file_exists($path) || is_link($path)) {

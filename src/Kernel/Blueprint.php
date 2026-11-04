@@ -84,6 +84,9 @@ final class Blueprint
         }
 
         $define($this->routes, $this->debug);
+        if (basename($path) === 'routes.php') {
+            \PhpOrbit\Api\RouteFiles::register($this->routes, dirname($path) . '/api');
+        }
 
         return $this;
     }

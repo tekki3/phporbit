@@ -21,6 +21,7 @@ use PhpOrbit\Config\MissingConfiguration;
 use PhpOrbit\Console\ClassMaker;
 use PhpOrbit\Console\AuthMaker;
 use PhpOrbit\Console\AuthAdmin;
+use PhpOrbit\Console\ApiMaker;
 use PhpOrbit\Console\ControllerMaker;
 use PhpOrbit\Console\FormMaker;
 use PhpOrbit\Console\Lifetime;
@@ -98,6 +99,9 @@ Commands:
   orbit make:auth
       Generate login, verified registration, MFA, profiles and administrator
       user management. Never overwrites existing files.
+  orbit make:api <Name> [--method=GET] [--version=1] [--public]
+      Generate a JSON endpoint, automatically register its versioned route
+      and include it in Swagger. Bearer authentication is required unless --public.
   orbit auth:admin <email>
       Grant administrator access to an existing verified, active scaffolded account.
   orbit new <directory> [--demo] [--force]
@@ -246,6 +250,34 @@ try {
             echo "For older projects, add inside the boot callback, after service bindings:\n  " . AuthMaker::WIRING . "\n\n";
             echo "Next: configure APP_URL and SMTP, run orbit migrate, then visit /register.\n";
             echo "After verifying your account: orbit auth:admin your@email.example\n";
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+        exit(0);
+
+    case 'make:api':
+        try {
+            $positional = array_values(array_filter(array_slice($arguments, 1),
+                static fn ($value): bool => is_string($value) && !str_starts_with($value, '--')));
+            if (count($positional) !== 1
+                || array_diff(array_keys($options), ['method', 'version', 'public']) !== []
+                || (isset($options['public']) && $options['public'] !== '1')) {
+                throw new InvalidArgumentException('Usage: orbit make:api <Name> [--method=GET] [--version=1] [--public]');
+            }
+            $method = \PhpOrbit\Http\Method::tryFrom(strtoupper($options['method'] ?? 'GET'));
+            $version = filter_var($options['version'] ?? '1', FILTER_VALIDATE_INT);
+            if ($method === null || $version === false) {
+                throw new InvalidArgumentException('Use a valid HTTP method and an integer API version.');
+            }
+            $made = (new ApiMaker($root))->create($positional[0], $method, $version, isset($options['public']));
+            printf("Created %s\nCreated %s\n\n%s %s — automatically registered.\n",
+                $made->controllerPath, $made->declarationPath, $method->value, $made->url);
+            echo "Edit the controller to return your data; edit the declaration for its OpenAPI schema.\n";
+            if (!isset($options['public'])) {
+                echo "Bearer-protected: in a blank project, run orbit make:auth once to provide token authentication.\n";
+            }
+            echo "Next: orbit migrate, restart the server, then open /api/docs.\n";
         } catch (InvalidArgumentException | RuntimeException $e) {
             fwrite(STDERR, $e->getMessage() . PHP_EOL);
             exit(1);

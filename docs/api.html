@@ -30,6 +30,21 @@
         <p>First-class APIs use the same request pipeline on workers and per-request SAPIs. The demo and <code>make:auth</code> include JSON login, scoped profile access, token revocation, browser-based personal-token management and interactive Swagger UI. Browser sessions never authenticate Bearer routes.</p>
 
 <h2>Start here</h2>
+<p>For a new endpoint, use the CLI. It writes the JSON controller and an editable declaration, then loads that declaration automatically at boot. No route registration needs to be pasted.</p>
+<figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-comment"># Protected endpoint: GET /api/v1/products</span>
+php orbit make:api Products
+
+<span class="tk-comment"># Public endpoint: GET /api/v1/ping</span>
+php orbit make:api Ping --public
+
+<span class="tk-comment"># POST /api/v2/create-product</span>
+php orbit make:api CreateProduct --method=POST --version=2
+
+php orbit migrate
+<span class="tk-comment"># Restart your server, then visit /api/docs.</span></code></pre></figure>
+<p><code>make:api Products</code> creates <code>app/src/Controllers/Api/V1/ProductsController.php</code> and <code>app/api/v1/products.php</code>. Edit the controller to return your data and the declaration to describe the operation in OpenAPI. The initial response is <code>{"message":"It works"}</code>. Names use StudlyCase and may be nested, such as <code>Admin/Report</code>. Supported methods are GET, POST, PUT, PATCH and DELETE; versions range from 1 to 999. Existing files are never overwritten.</p>
+<p>Bearer protection is the default. In a blank project, run <code>php orbit make:auth</code> once to install account/token authentication, or supply your own <code>Tokens</code> service and dependencies. A public endpoint needs no account setup. All generated endpoints default to sixty requests per minute, per user and operation (a shared anonymous bucket for public endpoints). The command installs the API migration and local Swagger assets when needed; run migrations before making requests. Adding authentication later reuses the existing API schema.</p>
+<p><code>Blueprint::loadRoutes()</code> automatically discovers adjacent <code>api/vN/*.php</code> declarations when loading <code>app/routes.php</code>. Each file returns a closure taking <code>VersionedRoutes</code>. Files are loaded once at boot, not during requests. The CLI route list, admin route list and the demo/generated-auth OpenAPI document include these endpoints too. Projects using a custom routing bootstrap can explicitly call <code>RouteFiles::register($routes, $root . '/app/api')</code>. Custom documentation handlers can merge declarations using <code>RouteFiles::document($directory, $existingDocument)</code>.</p>
 <figure class="code"><figcaption>Shell</figcaption><pre><code><span class="tk-comment"># In this repository&#039;s demo:</span>
 composer install
 php orbit migrate

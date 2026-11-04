@@ -8,8 +8,9 @@ use PhpOrbit\Auth\RequireAuthentication;
 use PhpOrbit\Routing\RouteCollection;
 
 return static function (RouteCollection $routes, bool $debug): void {
-    \App\AuthKit\ApiDefinition::register($routes);
-    $routes->get('/api/openapi.json', Auth\Api\OpenApiController::class, 'api.openapi');
+    $apiDocument = \App\AuthKit\ApiDefinition::register($routes);
+    $routes->get('/api/openapi.json', static fn (): \PhpOrbit\Http\Response =>
+        \PhpOrbit\Http\Response::json($apiDocument->document()), 'api.openapi');
     $routes->get('/api/docs', Auth\Api\SwaggerController::class, 'api.docs');
     $routes->get('/login', Auth\LoginController::class, 'login');
     $routes->post('/login', Auth\LoginAttemptController::class, 'login.attempt');

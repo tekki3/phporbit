@@ -46,8 +46,9 @@ return static function (RouteCollection $routes, bool $debug): void {
     $routes->get('/contact', ContactController::class, 'contact');
     $routes->post('/contact', SubmitContactController::class, 'contact.submit');
     $routes->get('/health', HealthController::class, 'health');
-    App\Support\ApiDefinition::register($routes);
-    $routes->get('/api/openapi.json', App\Controllers\Api\OpenApiController::class, 'api.openapi');
+    $apiDocument = App\Support\ApiDefinition::register($routes);
+    $routes->get('/api/openapi.json', static fn (): \PhpOrbit\Http\Response =>
+        \PhpOrbit\Http\Response::json($apiDocument->document()), 'api.openapi');
     $routes->get('/api/docs', App\Controllers\Api\SwaggerController::class, 'api.docs');
 
     // ------------------------------------------------------------------ auth

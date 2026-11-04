@@ -43,6 +43,11 @@ final class VersionedRoutes
         }
         $prefix = '/api/v' . $this->version;
         $pattern = $prefix . $path;
+        foreach ($this->routes->compile()->routes() as $existing) {
+            if ($existing->method === $method && $existing->pattern === \PhpOrbit\Routing\Router::normalise($pattern)) {
+                throw new InvalidArgumentException('Duplicate API route: ' . $method->value . ' ' . $pattern);
+            }
+        }
         $openPath = preg_replace('/\{([a-zA-Z_][a-zA-Z0-9_]*):[^}]+\}/', '{$1}', $pattern);
         if ($openPath === null || isset($this->paths[$openPath][strtolower($method->value)])) {
             throw new InvalidArgumentException('Duplicate or invalid API operation.');

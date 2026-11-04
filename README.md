@@ -145,6 +145,11 @@ overwrites files or replaces existing demo authentication.
 
 API support includes JWT access tokens, revocable personal Bearer tokens,
 `/api/v1` routes, database-backed rate limits and locally hosted Swagger UI.
+Create an endpoint with `php orbit make:api Products`; its route and OpenAPI
+description load automatically. Use `--public` for a public endpoint, or
+`--method=POST --version=2` to choose another method/version. Run migrations
+and restart the server afterward. Blank projects use `make:auth` for token
+authentication; public endpoints do not require it.
 Visit `/api/docs` and manage personal tokens at `/account/tokens`.
 See [APIs](docs/api.html) for the framework APIs and security requirements.
 
