@@ -101,4 +101,31 @@ final class SessionTest extends TestCase
         self::assertFalse(Session::isValidId(str_repeat('a', 63)));
         self::assertTrue(Session::isValidId(str_repeat('a', 64)));
     }
+
+    public function test_frozen_sessions_remain_readable_and_refuse_all_mutations(): void
+    {
+        $data = ['user' => 'ada', '_flash.notice' => 'saved'];
+        foreach ([
+            static function (Session $session): void { $session->set('user', 'bob'); },
+            static function (Session $session): void { $session->remove('user'); },
+            static function (Session $session): void { $session->regenerate(); },
+            static function (Session $session): void { $session->destroy(); },
+            static function (Session $session): void { $session->flash('notice', 'changed'); },
+            static function (Session $session): void { $session->takeFlash('notice'); },
+        ] as $mutate) {
+            $session = new Session(Session::generateId(), $data, isNew: false);
+            $originalId = $session->id();
+            $session->freeze();
+            self::assertSame('ada', $session->get('user'));
+            try {
+                $mutate($session);
+                self::fail('Frozen session accepted a mutation.');
+            } catch (\LogicException $error) {
+                self::assertStringContainsString('streaming response', $error->getMessage());
+            }
+            self::assertSame($originalId, $session->id());
+            self::assertSame($data, $session->all());
+            self::assertFalse($session->isDirty());
+        }
+    }
 }

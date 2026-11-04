@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpOrbit\Http;
 
+use Closure;
 use PhpOrbit\Security\Escaper;
 
 final class Response
@@ -12,6 +13,7 @@ final class Response
         public readonly Status $status,
         public readonly Headers $headers,
         public readonly string $body,
+        public readonly ?StreamBody $stream = null,
     ) {
     }
 
@@ -71,6 +73,15 @@ final class Response
         return self::make(Status::NoContent);
     }
 
+    /** @param Closure(): iterable<string> $produce */
+    public static function stream(Closure $produce, Status $status = Status::Ok): self
+    {
+        $response = self::text('', $status)->withHeader('Cache-Control', 'no-store')
+            ->withHeader('X-Accel-Buffering', 'no');
+
+        return new self($response->status, $response->headers, '', new StreamBody($produce));
+    }
+
     /**
      * Adds a Set-Cookie header, keeping any already present.
      */
@@ -81,22 +92,29 @@ final class Response
 
     public function withHeader(string $name, string $value): self
     {
-        return new self($this->status, $this->headers->with($name, $value), $this->body);
+        return new self($this->status, $this->headers->with($name, $value), $this->body, $this->stream);
     }
 
     public function withAddedHeader(string $name, string $value): self
     {
-        return new self($this->status, $this->headers->add($name, $value), $this->body);
+        return new self($this->status, $this->headers->add($name, $value), $this->body, $this->stream);
     }
 
     public function withStatus(Status $status): self
     {
-        return new self($status, $this->headers, $this->body);
+        return new self($status, $this->headers, $this->body, $this->stream);
     }
 
     public function withBody(string $body): self
     {
         return new self($this->status, $this->headers, $body);
+    }
+
+    public function prepareStream(): self
+    {
+        return $this->stream === null ? $this : new self(
+            $this->status, $this->headers, $this->body, $this->stream->prepared(),
+        );
     }
 
     /**
@@ -106,6 +124,9 @@ final class Response
      */
     public function wireBody(): string
     {
+        if ($this->stream !== null && $this->status->allowsBody()) {
+            throw new \LogicException('Streaming bodies must be emitted incrementally or collected through Application::handle().');
+        }
         return $this->status->allowsBody() ? $this->body : '';
     }
 

@@ -352,6 +352,22 @@ Two details worth keeping if you edit it:
 
 `composer.lock` is git-ignored (this is a library), so CI resolves dependencies fresh. That is intentional: it means a transitive break in phpstan or phpunit shows up here rather than the first time someone installs.
 
+## AI and streaming responses
+
+`Ai\Agent` clones on configuration changes; framework providers are stateless.
+Every `send()`/stream owns a fresh bounded curl transport. Keys, prompts and
+provider response bodies must never enter diagnostics; no automatic retries.
+Only literal loopback endpoints may use HTTP, remote endpoints require TLS.
+Use `Environment::required()` for keys, not a global `env()` helper.
+
+`Response::stream()` holds a lazy producer, not a string body.
+`Application::respond()` retains the scope through emission and closes it in
+`finally`; every SAPI uses it. `handle()` collects streams inside the scope for
+direct callers. HEAD/204/304 never iterate. Producers are primed before headers,
+and later failures abort rather than sending another response. Session changes
+must finish before returning the response (stream sessions are frozen), while
+upload cleanup and transaction cleanup cover stream completion/disconnection.
+
 ## API support
 
 `Api\VersionedRoutes` is a boot-only builder for `/api/vN` routes and OpenAPI
@@ -449,7 +465,7 @@ An occupied target directory is refused unless `--force`; `.env` is never overwr
 
 ## Developer documentation
 
-`docs/` holds 31 self-contained HTML pages — open `docs/index.html` directly, no server or toolchain needed. Regenerate with `php docs/build.php`.
+`docs/` holds 32 self-contained HTML pages — open `docs/index.html` directly, no server or toolchain needed. Regenerate with `php docs/build.php`.
 
 They are also served by the running app at **`/docs`**, linked from the masthead. That works via a second `ServeStaticFiles` mounted with `prefix: '/docs'` pointing at `docs/`, rather than copying generated HTML into `public/` — one source of truth, nothing duplicated into the document root. A symlink would not work: `ServeStaticFiles` resolves with `realpath()` and refuses anything outside its root.
 

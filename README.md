@@ -229,6 +229,16 @@ sessions, password hashing, and a query builder that refuses an accidental
 For work on the framework itself, [CLAUDE.md](CLAUDE.md) explains its design
 constraints and contributor expectations.
 
+## AI text generation
+
+Use `PhpOrbit\Ai\Agent::using(OpenAI::class)->withKey($env->required('OPENAI_API_KEY'))`
+with `model(...)`, `prompt(...)` and `send()` for text. `withStreaming()->send()`
+returns text chunks; `withStreaming()->response()` returns a live HTTP stream
+from a controller. OpenAI, Anthropic and OpenAI-compatible local providers are
+supported through `ext-curl`. No provider is contacted automatically.
+See [AI agents](docs/ai.html) for configuration, costs, limits and worker-safe
+streaming examples.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Vendored Swagger UI retains its Apache-2.0

@@ -130,8 +130,18 @@ Response::json(['note' => '</script><script>alert(1)</script>']);
 
 <p>JSON is encoded with the <code>JSON_HEX_*</code> flags, so a payload containing <code>&lt;/script&gt;</code> cannot break out if the response is inlined into a page.</p>
 
-<h2>HEAD requests</h2>
+<h2>Streaming bodies</h2>
+[[php]]
+<?php
+return Response::stream(static function (): \Generator {
+    yield "First part\n";
+    yield "Next part\n";
+});
+[[/php]]
+<p>Streams are emitted incrementally by every adapter, without a Content-Length header. Orbit uses HTTP/1.1 chunked response framing; the web SAPIs flush PHP output. Headers/status modifiers preserve the producer, while <code>withBody()</code> replaces it with a buffered string. The first chunk is prepared before headers are committed. Complete session changes before returning the stream: writes during lazy iteration are refused.</p>
+<p><code>Application::respond($request, $emit)</code> retains the request scope until emission completes, closing it in <code>finally</code>. Adapters use this method. Direct <code>handle()</code> callers receive a collected string body, still produced within the scope; this deliberately buffers the whole result. Do not call <code>wireBody()</code> on an uncollected stream. HEAD, 204 and 304 never start the producer. After output starts, a failure is logged and aborts the stream rather than sending a second response. See <a href="ai.html">AI agents</a> for real provider streaming and proxy configuration.</p>
 
+<h2>HEAD requests</h2>
 <p>A <code>HEAD</code> is routed to the matching <code>GET</code> handler; the kernel strips the body afterwards. Your handler never checks for it. Headers stay identical, which is the point of the method.</p>
 
 <h2>204 and 304</h2>

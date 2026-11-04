@@ -113,6 +113,17 @@ For a longer walkthrough and troubleshooting, open the framework's
 in your browser. Documentation lives in the dependency; this application
 does not include a `/docs` route.
 
+## Optional AI text generation
+
+`PhpOrbit\Ai\Agent` supports OpenAI, Anthropic and compatible local providers.
+Read keys through the injected `Environment::required()`, then chain
+`model(...)`, `prompt(...)` and `send()` for text. Use
+`withStreaming()->response()` to return live text from a controller;
+`withStreaming()->send()` returns a generator for CLI iteration. Enable
+`ext-curl`, keep credentials server-side, and budget/rate-limit live calls.
+See [AI agents](vendor/phporbit/phporbit/docs/ai.html) for examples and streaming
+deployment configuration.
+
 ## If something goes wrong
 
 - **Cannot open `orbit`:** check that your terminal is in this project folder.

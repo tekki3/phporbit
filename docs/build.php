@@ -38,7 +38,7 @@ const NAV = [
     'Building blocks' => ['container', 'middleware', 'templates'],
     'Data' => ['database', 'queries', 'migrations', 'models', 'caching'],
     'Users and safety' => ['security', 'sessions', 'auth', 'advanced-auth', 'validation', 'uploads', 'encryption'],
-    'Talking outward' => ['mail'],
+    'Talking outward' => ['mail', 'ai'],
     'Operating it' => ['cli', 'admin-ui', 'logging', 'testing', 'deployment'],
 ];
 

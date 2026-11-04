@@ -140,16 +140,11 @@ final class OrbitServer implements Sapi
                     return;
                 }
 
-                $response = $app->handle($request);
                 $keepAlive = $this->shouldKeepAlive($request);
-
-                $this->write($connection, $response, $keepAlive);
-                ($this->log)(sprintf(
-                    '%s %s -> %d',
-                    $request->method->value,
-                    $request->uri->path,
-                    $response->status->value,
-                ));
+                $app->respond($request, function (Response $response) use ($connection, $keepAlive, $request): void {
+                    $this->write($connection, $response, $keepAlive);
+                    ($this->log)(sprintf('%s %s -> %d', $request->method->value, $request->uri->path, $response->status->value));
+                });
 
                 if (!$keepAlive) {
                     return;
@@ -157,8 +152,8 @@ final class OrbitServer implements Sapi
             }
         } catch (Throwable $e) {
             // A failure here is in the transport, not the application —
-            // Application::handle() has already dealt with handler errors.
-            ($this->log)('connection error: ' . $e->getMessage());
+            // Lazy producers can also fail here; never expose their payloads.
+            ($this->log)('connection error: ' . $e::class);
         } finally {
             fclose($connection);
         }
@@ -176,7 +171,9 @@ final class OrbitServer implements Sapi
      */
     private function write($connection, Response $response, bool $keepAlive): void
     {
-        $body = $response->wireBody();
+        $chunks = $response->status->allowsBody() ? $response->stream?->chunks() : null;
+        $chunks?->rewind();
+        $body = $chunks === null ? $response->wireBody() : '';
 
         $head = sprintf(
             "HTTP/1.1 %d %s\r\n",
@@ -185,18 +182,28 @@ final class OrbitServer implements Sapi
         );
 
         foreach ($response->headers->toWire() as [$name, $value]) {
+            if (in_array(strtolower($name), ['content-length', 'transfer-encoding', 'connection'], true)) {
+                continue;
+            }
             $head .= $name . ': ' . $value . "\r\n";
         }
 
-        // Content-Length is always written so keep-alive can frame the next
-        // request; without it the client cannot tell where this body ends.
-        if ($response->status->allowsBody()) {
+        // Both framing forms delimit the body for the next keep-alive request.
+        if ($chunks !== null) {
+            $head .= "Transfer-Encoding: chunked\r\n";
+        } elseif ($response->status->allowsBody()) {
             $head .= 'Content-Length: ' . strlen($body) . "\r\n";
         }
 
         $head .= 'Connection: ' . ($keepAlive ? 'keep-alive' : 'close') . "\r\n\r\n";
 
         $this->writeAll($connection, $head . $body);
+        if ($chunks !== null) {
+            foreach ($chunks as $chunk) {
+                $this->writeAll($connection, dechex(strlen($chunk)) . "\r\n" . $chunk . "\r\n");
+            }
+            $this->writeAll($connection, "0\r\n\r\n");
+        }
     }
 
     /**

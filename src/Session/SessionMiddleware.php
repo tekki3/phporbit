@@ -40,7 +40,11 @@ final class SessionMiddleware implements Middleware
 
         $response = $next($request);
 
-        return $this->persist($request, $response, $session, $originalId);
+        $response = $this->persist($request, $response, $session, $originalId);
+        if ($response->stream !== null) {
+            $session->freeze();
+        }
+        return $response;
     }
 
     private function load(ServerRequest $request): Session

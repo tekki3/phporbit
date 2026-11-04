@@ -34,7 +34,7 @@ final class FpmSapi implements Sapi
 
     public function run(Application $app): void
     {
-        $this->emitter->emit($app->handle($this->captureRequest()));
+        $app->respond($this->captureRequest(), $this->emitter->emit(...));
     }
 
     public function captureRequest(): ServerRequest

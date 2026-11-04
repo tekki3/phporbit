@@ -90,24 +90,78 @@ final class Application
      */
     public function handle(ServerRequest $request): Response
     {
+        $result = null;
+        $this->respond($request, static function (Response $response) use (&$result): void {
+            if ($response->stream !== null) {
+                $body = '';
+                foreach ($response->stream->chunks() as $chunk) {
+                    $body .= $chunk;
+                }
+                $response = $response->withBody($body);
+            }
+            $result = $response;
+        });
+
+        return $result ?? throw new \LogicException('The response was not produced.');
+    }
+
+    /**
+     * Keeps the scope alive until emission finishes, including lazy streams.
+     *
+     * @param Closure(Response): void $emit
+     */
+    public function respond(ServerRequest $request, Closure $emit): void
+    {
         // Captured before middleware can hand a modified request down the
         // chain, because the body-stripping rule follows the original method.
         $isHead = $request->method === Method::Head;
 
         $scope = $this->container->enterRequest();
 
+        $preparingStream = false;
         try {
-            $response = $this->pipeline($request, $scope);
-        } catch (MalformedRequest $e) {
-            $response = $this->clientError($e);
+            try {
+                $response = $this->pipeline($request, $scope);
+                if (!$isHead && $response->status->allowsBody()) {
+                    $preparingStream = $response->stream !== null;
+                    $response = $response->prepareStream();
+                    $preparingStream = false;
+                }
+            } catch (MalformedRequest $e) {
+                $response = $this->clientError($e);
+            } catch (Throwable $e) {
+                if ($preparingStream) {
+                    $this->logEmissionFailure($request, $scope, $e);
+                }
+                $response = $this->serverError($e);
+            }
+            if ($isHead || !$response->status->allowsBody()) {
+                $response = $response->withBody('');
+            }
+            $emit($response);
         } catch (Throwable $e) {
-            $response = $this->serverError($e);
+            $this->logEmissionFailure($request, $scope, $e);
+            throw $e;
         } finally {
-            $scope->close();
+            try {
+                if (isset($response)) {
+                    $response->stream?->close();
+                }
+            } finally {
+                $scope->close();
+            }
         }
+    }
 
-        // A HEAD response must be byte-identical to the GET one minus the body.
-        return $isHead ? $response->withBody('') : $response;
+    private function logEmissionFailure(ServerRequest $request, RequestScope $scope, Throwable $error): void
+    {
+        if ($scope->provided(\PhpOrbit\Log\Logger::class) || $this->container->has(\PhpOrbit\Log\Logger::class)) {
+            $scope->get(\PhpOrbit\Log\Logger::class)->log(\PhpOrbit\Log\Level::Error, 'Response emission failed', [
+                'exception' => $error::class, 'method' => $request->method->value, 'path' => $request->uri->path,
+            ]);
+        } else {
+            error_log('Response emission failed: ' . $error::class);
+        }
     }
 
     /**

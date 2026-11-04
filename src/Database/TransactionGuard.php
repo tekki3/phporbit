@@ -39,21 +39,24 @@ final class TransactionGuard implements Middleware
 
     public function process(ServerRequest $request, RequestScope $scope, Closure $next): Response
     {
+        $connection = $scope->get(Connection::class);
+        $scope->onClose(function () use ($request, $connection): void {
+            $this->clean($request, $connection);
+        });
         try {
             return $next($request);
         } finally {
-            $connection = $scope->get(Connection::class);
+            $this->clean($request, $connection);
+        }
+    }
 
-            if ($connection->rollBackIfOpen()) {
-                // Silence would let the bug persist while the symptoms appear
-                // in an unrelated request later on.
-                $this->report(sprintf(
-                    'Transaction left open by %s %s was rolled back. A handler opened a '
-                    . 'transaction without committing it.',
-                    $request->method->value,
-                    $request->uri->path,
-                ));
-            }
+    private function clean(ServerRequest $request, Connection $connection): void
+    {
+        if ($connection->rollBackIfOpen()) {
+            $this->report(sprintf(
+                'Transaction left open by %s %s was rolled back. A handler opened a transaction without committing it.',
+                $request->method->value, $request->uri->path,
+            ));
         }
     }
 

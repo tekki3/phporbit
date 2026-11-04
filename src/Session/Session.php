@@ -27,6 +27,7 @@ final class Session
     private bool $dirty = false;
 
     private bool $destroyed = false;
+    private bool $frozen = false;
 
     /**
      * @param array<string, scalar> $data
@@ -90,6 +91,7 @@ final class Session
 
     public function set(string $key, string|int|float|bool $value): void
     {
+        $this->assertWritable();
         if (array_key_exists($key, $this->data) && $this->data[$key] === $value) {
             return;
         }
@@ -100,6 +102,7 @@ final class Session
 
     public function remove(string $key): void
     {
+        $this->assertWritable();
         if (!array_key_exists($key, $this->data)) {
             return;
         }
@@ -147,6 +150,7 @@ final class Session
      */
     public function regenerate(): string
     {
+        $this->assertWritable();
         $previous = $this->id;
 
         $this->id = self::generateId();
@@ -161,6 +165,7 @@ final class Session
      */
     public function destroy(): void
     {
+        $this->assertWritable();
         $this->data = [];
         $this->destroyed = true;
         $this->dirty = true;
@@ -180,5 +185,17 @@ final class Session
     public static function isValidId(string $id): bool
     {
         return preg_match('/^[a-f0-9]{64}$/', $id) === 1;
+    }
+
+    public function freeze(): void
+    {
+        $this->frozen = true;
+    }
+
+    private function assertWritable(): void
+    {
+        if ($this->frozen) {
+            throw new \LogicException('Session changes must be completed before returning a streaming response.');
+        }
     }
 }

@@ -99,6 +99,22 @@ registration next to it is safe — one `Connection`, shared by every request in
 the process either way. Do not call it a second time, and do not add a second
 static anywhere else on `Model`'s account.
 
+## AI and streaming
+
+`PhpOrbit\Ai\Agent` supports OpenAI, Anthropic and OpenAI-compatible providers.
+Use the injected `Environment::required()` for provider keys, never a global
+`env()` helper or browser-side secret. Set `model()` and `prompt()` explicitly;
+`send()` returns text, `withStreaming()->send()` returns a lazy text generator,
+and `withStreaming()->response()` is the controller's live HTTP response.
+Requires `ext-curl`; calls can incur costs. Never log prompts, keys or raw
+provider errors, and never let clients choose arbitrary endpoint URLs.
+
+For any lazy response, finish session/cookie/auth changes before returning.
+Sessions are then read-only. Return `Response::stream()`, do not echo/flush
+inside handlers. The kernel keeps scoped services/uploads alive through
+emission and cleans them before the next request. `Application::handle()`
+buffers streams; the adapters use `respond()` for incremental output.
+
 ## Caching
 
 Inject `PhpOrbit\Cache\Cache`; use `remember($key, fn () => $value, 300)`,

@@ -44,7 +44,7 @@ final class FrankenPhpSapi implements Sapi
         $served = 0;
 
         $handle = function () use ($app): void {
-            $this->emitter->emit($app->handle($this->capture->captureRequest()));
+            $app->respond($this->capture->captureRequest(), $this->emitter->emit(...));
         };
 
         do {

@@ -42,7 +42,7 @@
         "orbit"
     ],
     "suggest": {
-        "ext-curl": "Required for Google, Microsoft Entra ID and other OpenID Connect logins.",
+        "ext-curl": "Required for AI providers and Google, Microsoft Entra ID and other OpenID Connect logins.",
         "ext-memcached": "Required for CACHE_DRIVER=memcached.",
         "ext-redis": "Required for CACHE_DRIVER=redis."
     },

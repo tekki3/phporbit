@@ -61,4 +61,40 @@ final class ResponseTest extends TestCase
         self::assertSame(Status::Found, $response->status);
         self::assertSame('/elsewhere', $response->headers->first('Location'));
     }
+
+    public function test_stream_modifiers_preserve_the_producer_and_body_replacement_removes_it(): void
+    {
+        $response = Response::stream(static function (): \Generator {
+            yield '';
+            yield 'one';
+            yield 'two';
+        });
+        $modified = $response->withStatus(Status::Created)->withHeader('X-Test', 'yes')->withAddedHeader('X-Test', 'also');
+        self::assertSame($response->stream, $modified->stream);
+        self::assertNotNull($modified->stream);
+        self::assertSame(['one', 'two'], iterator_to_array($modified->stream->chunks()));
+        self::assertSame('no-store', $modified->headers->first('Cache-Control'));
+        self::assertSame('no', $modified->headers->first('X-Accel-Buffering'));
+        $buffered = $modified->withBody('replacement');
+        self::assertNull($buffered->stream);
+        self::assertSame('replacement', $buffered->wireBody());
+        $modified->stream->close();
+        $this->expectException(\LogicException::class);
+        $modified->stream->chunks();
+    }
+
+    public function test_preparing_a_stream_twice_does_not_start_a_second_producer(): void
+    {
+        $calls = 0;
+        $response = Response::stream(static function () use (&$calls): \Generator {
+            $calls++;
+            yield 'first';
+            yield 'last';
+        });
+        $prepared = $response->prepareStream()->prepareStream();
+        self::assertSame(1, $calls);
+        self::assertNotNull($prepared->stream);
+        self::assertSame(['first', 'last'], iterator_to_array($prepared->stream->chunks()));
+        $prepared->stream->close();
+    }
 }
