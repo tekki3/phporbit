@@ -9,6 +9,41 @@ return [
     'body' => <<<'HTML'
 <p>One sign-in pipeline, several primary methods: password, email link, Google or Microsoft Entra ID. An enrolled authenticator remains mandatory for all of them. External accounts are linked explicitly from an existing, password-confirmed account; matching email addresses never create or link accounts.</p>
 
+<h2 id="new-project">Start here: accounts in a blank project</h2>
+<p>First <a href="getting-started.html#create-project">create and install a blank project</a>. From its root, run the following once; skip generation if you already added authentication:</p>
+[[bash]]
+php orbit make:auth
+[[/bash]]
+<p>The command preserves your existing routes and layout. It generates verified registration, login, password reset, magic links, MFA, account pages and administrator management. It also provides the token services for <a href="api.html#protected-endpoint">protected APIs</a>. A demo project already has authentication; do not overlay <code>make:auth</code> on it.</p>
+<p>Configure your own SMTP server or local mail catcher in <code>.env</code>. This loopback example uses the same host and port as the start guide; replace the SMTP placeholders with values supplied by your mail service:</p>
+[[ini]]
+APP_URL=http://127.0.0.1:8080
+MAIL_DRIVER=smtp
+MAIL_HOST=smtp.example.com
+MAIL_ENCRYPTION=tls
+MAIL_PORT=587
+MAIL_USERNAME=your-smtp-user
+MAIL_PASSWORD=your-smtp-password
+MAIL_FROM_ADDRESS=no-reply@example.com
+[[/ini]]
+<p>Keep the project's generated <code>APP_KEY</code>. Do not commit <code>.env</code>. The default <code>MAIL_DRIVER=array</code> delivers no verification mail; a successful registration cannot be tested with that default. For production, use your public HTTPS <code>APP_URL</code>. The <a href="#password-links">mail and link rules below</a> explain why authentication messages bypass the readable mail audit.</p>
+[[bash]]
+php orbit migrate
+php orbit serve --debug
+[[/bash]]
+<ol>
+<li>Open <code>http://127.0.0.1:8080/register</code> and submit your own email, display name and a password of 12–72 bytes.</li>
+<li>Open the verification email in your browser and confirm on the page. Opening the email link alone does not create the account.</li>
+<li>Sign in at <code>/login</code>. The <code>/account</code> page should show your profile.</li>
+<li>Open <code>/account/security</code>, confirm your password, add the setup key to an authenticator app and verify one code. Save the recovery codes privately before leaving the page.</li>
+<li>Sign out and back in to check that both the password and a fresh authenticator code are required. A previously used code cannot be replayed.</li>
+</ol>
+<p>To appoint your verified account as an administrator, use a second, trusted terminal in the project folder:</p>
+[[bash]]
+php orbit auth:admin you@example.com
+[[/bash]]
+<p>Replace the example email with the account you verified. Sign in again, then visit <code>/account/users</code>. An ordinary member cannot open that page or promote themselves. See <a href="#generated-module">the generated-module reference</a> for file locations, administrator safeguards and older-project boot hooks. Restart the server after PHP or configuration changes; use debug only locally.</p>
+
 <h2>Try the complete demo</h2>
 <p>For a new application rather than this repository's demo, generate the same security flows plus verified registration and user management with <code>php orbit make:auth</code>.</p>
 [[bash]]
@@ -21,7 +56,7 @@ php orbit serve
 <p>The setup key is a secret, not a password. Do not copy it into chat, screenshots or logs. Enrollment expires after ten minutes; an unfinished sign-in expires after five minutes. TOTP uses RFC 6238, SHA-1, six digits and 30-second steps, accepting one step of clock skew in either direction. A database compare-and-swap prevents a time step from being accepted twice; recovery codes are deleted atomically when used.</p>
 <p>Disabling MFA requires both your password and an unused authenticator or recovery code. It revokes remaining recovery codes and other sessions. To replace the authenticator or obtain new recovery codes, disable it and enroll again. Password resets and magic links <strong>do not disable MFA</strong>. If both the authenticator and all recovery codes are lost, recovery needs the site operator's independently verified process; there is deliberately no email-only MFA bypass.</p>
 
-<h2>Password reset and magic links</h2>
+<h2 id="password-links">Password reset and magic links</h2>
 <p><code>/password/forgot</code> emails a reset link; <code>/magic</code> emails a sign-in link. Both expire after fifteen minutes. Opening a link stores it in the browser's private session and redirects to a clean URL. Only a CSRF-protected POST consumes it: mail scanners and link previews do not reset passwords or sign users in. Use the same browser for the confirmation step. A magic link replaces only the password; MFA is still required.</p>
 <p>Reset passwords must be 12–72 bytes. A reset updates the password, revokes all other email links and existing sessions, and leaves MFA enabled. New links are bound to the current password hash and security version. Their 256-bit random values are hashed in the database; purpose, expiration and single use are checked in the same transaction as the action.</p>
 [[ini]]
@@ -66,17 +101,9 @@ ENTRA_TENANT_IDS=11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-22
 <p>For local development register the exact loopback callback URL, matching <code>APP_URL</code>, including port and whether you used <code>localhost</code> or <code>127.0.0.1</code>. Real provider credentials and consent are required to test the complete external service; deterministic tests use locally signed JWTs and a fake HTTP transport, not real Google or Microsoft sessions.</p>
 
 <h2>Reusable framework APIs</h2>
-<h3>Scaffold a complete authentication module</h3>
+<h3 id="generated-module">Generated authentication module</h3>
 <p>Generated modules also include <a href="api.html">versioned APIs</a>: JWT login with MFA, personal Bearer tokens managed at <code>/account/tokens</code>, shared rate limits and locally hosted Swagger UI at <code>/api/docs</code>. Browser account forms remain script-free.</p>
-[[bash]]
-php orbit new my-app
-cd my-app
-composer install
-php orbit make:auth
-# Set MAIL_DRIVER=smtp, SMTP credentials and APP_URL in .env.
-php orbit migrate
-php orbit serve
-[[/bash]]
+<p>For the installation and first sign-in sequence, use <a href="#new-project">the setup above</a>. The following sections describe what the generator writes and the guarantees to preserve when editing it.</p>
 <p>Visit <code>/register</code>. Registration sends a one-use, hashed verification link that expires after thirty minutes. It stores a pending registration, not a sign-in-capable user. A CSRF-protected confirmation POST creates the account; a mail scanner's GET does not. Re-submit the registration form to request another email. Expired pending rows are reclaimed on new requests. Pending and verified passwords are hashed with <code>PasswordHasher</code>. Registrations, verification mail and reset links never enter the readable mail audit.</p>
 <p>The default <code>MAIL_DRIVER=array</code> cannot deliver verification email, so registration shows an explicit configuration error rather than granting an unverified account access. SMTP delivery failures are logged without message contents, and the browser receives the same generic response as duplicate addresses and account-wide throttles. As with other email flows, network timing can still vary. Production deployments should add trusted edge-level abuse limits.</p>
 <p>After registering and verifying your own email, appoint the first administrator from a trusted terminal:</p>

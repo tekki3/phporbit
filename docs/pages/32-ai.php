@@ -9,7 +9,43 @@ return [
     'body' => <<<'HTML'
 <p><code>PhpOrbit\Ai\Agent</code> provides a fluent, immutable builder for text generation. OpenAI, Anthropic and OpenAI-compatible services share one interface. Each call owns its HTTP connection; prompts, credentials and conversation state are never cached globally. This is a text-generation API, not an autonomous tool-running agent.</p>
 
-<h2>Configuration</h2>
+<h2 id="first-answer">Start here: a runnable PHP script</h2>
+<p>Use an <a href="getting-started.html#create-project">installed phporbit project</a> with <code>vendor/autoload.php</code>. This example runs in the terminal, without publishing an endpoint or adding authentication. Enable <code>ext-curl</code>, then put your own key and an account-accessible model in <code>.env</code>:</p>
+[[ini]]
+OPENAI_API_KEY=your-provider-key
+OPENAI_MODEL=gpt-4
+[[/ini]]
+<p>Create <code>ask-ai.php</code> beside <code>composer.json</code>:</p>
+[[php]]
+<?php
+
+declare(strict_types=1);
+
+use PhpOrbit\Ai\Agent;
+use PhpOrbit\Ai\Providers\OpenAI;
+use PhpOrbit\Config\Environment;
+
+require __DIR__ . '/vendor/autoload.php';
+
+$env = Environment::load(__DIR__ . '/.env');
+
+$answer = Agent::using(OpenAI::class)
+    ->withKey($env->required('OPENAI_API_KEY'))
+    ->model($env->required('OPENAI_MODEL'))
+    ->prompt('Explain request isolation in PHP in three short sentences.')
+    ->maxTokens(256)
+    ->timeout(30)
+    ->send();
+
+echo $answer . PHP_EOL;
+[[/php]]
+[[bash]]
+php ask-ai.php
+[[/bash]]
+<p>You should see generated text in the terminal, not a fixed answer. No web server or migration is needed for this script. Each run makes a real provider request and can incur costs. Use a non-sensitive prompt and do not commit your key. If the call fails, follow <a href="#errors">the error checklist</a>; do not share raw credentials or provider responses in a bug report.</p>
+<p>For Claude, <a href="#claude">switch the provider, key and model together</a>. To print chunks instead of waiting for one answer, use <a href="#cli-streaming">the streaming variant</a>. Framework configuration methods are typed; a global <code>env()</code> helper does not exist.</p>
+
+<h2 id="configuration">Configuration</h2>
 <p>Enable <code>ext-curl</code> and configure a provider key in your real environment or <code>.env</code>. Configuration is read at boot through <code>Environment</code>, not a global <code>env()</code> helper. Keep keys on the server. The framework does not contact a provider automatically.</p>
 [[ini]]
 OPENAI_API_KEY=your-provider-key
@@ -38,7 +74,8 @@ $answer = Agent::using(OpenAI::class)
 [[/php]]
 <p>The model is explicit, not a framework default. Choose a model available to your provider account. OpenAI uses <code>/v1/chat/completions</code>, with <code>max_completion_tokens</code>; this supports the example's familiar chat interface, not every capability of OpenAI's Responses API. Parameter/model compatibility is the provider's responsibility.</p>
 
-<h2>Streaming in the CLI</h2>
+<h2 id="cli-streaming">Streaming in the CLI</h2>
+<p>Keep the autoloader and <code>Environment::load()</code> setup from <code>ask-ai.php</code> above. Replace its answer-generation and echo statements with this loop, choosing a model available to your account:</p>
 [[php]]
 <?php
 use PhpOrbit\Ai\Agent;
@@ -59,8 +96,9 @@ foreach ($stream as $chunk) {
 <p><code>withStreaming()</code> returns a <code>StreamingAgent</code> whose <code>send()</code> returns a <code>Generator&lt;int, string&gt;</code>. It does not issue a request until iteration starts. Chunks contain text only, not raw SSE/JSON or provider metadata. Chunks are arbitrary text fragments, not complete words or lines. Configuration methods belong before <code>withStreaming()</code>. You can also use <code>$agent-&gt;stream()</code> directly.</p>
 <p>If iteration is abandoned, release the generator (for example <code>unset($stream)</code>) so its <code>finally</code> closes the upstream connection promptly. There is no automatic retry: retrying a partial generation could repeat text and incur another charge.</p>
 
-<h2>Live HTTP streaming</h2>
+<h2 id="http-streaming">Live HTTP streaming</h2>
 <p>Inside a controller, return a response rather than echoing or calling <code>flush()</code>. The adapters own the output layer:</p>
+<p>Generate a starting class with <code>php orbit make:controller Explain</code>, then replace <code>app/src/Controllers/ExplainController.php</code> with the class below. The example demonstrates the response API; it does not register a route or authorize a caller. Before exposing it, wire it into your application's guarded routes and apply rate limits and a budget policy. Do not use a public generated API as an unrestricted AI proxy.</p>
 [[php]]
 <?php
 namespace App\Controllers;
@@ -93,7 +131,13 @@ final class ExplainController implements Handler
 <p>Configure your reverse proxy/CDN not to buffer this route, disable compression/output handlers that buffer, and allow suitable request timeouts. The web emitter supports at most one flushable PHP output buffer; nested/nonflushable buffers fail explicitly instead of silently buffering a stream. PHP/web-server configuration can still buffer despite application flush calls. Orbit's development server is sequential: one long generation occupies it until completion. Production streaming also occupies a worker. Authenticate and rate-limit any publicly accessible AI endpoint and enforce your own budget policy.</p>
 <p>Request-logging middleware measures handler/pipeline time, not the full duration of stream consumption. The kernel logs later emission failures separately. Stream responses and their iterators are single-use; an emitter must consume synchronously, not save them for use after the scope closes.</p>
 
-<h2>Anthropic</h2>
+<h2 id="claude">Claude through Anthropic</h2>
+<p>Claude is supported by <code>PhpOrbit\Ai\Providers\Anthropic</code>. In the runnable script, change the provider import and <code>Agent::using()</code> to <code>Anthropic</code>, and use <code>ANTHROPIC_API_KEY</code> and <code>ANTHROPIC_MODEL</code> instead of the OpenAI settings. Configure a model available to your Anthropic account, for example:</p>
+[[ini]]
+ANTHROPIC_API_KEY=your-provider-key
+ANTHROPIC_MODEL=claude-sonnet-4-5
+[[/ini]]
+<p>The key and model calls become <code>withKey($env-&gt;required('ANTHROPIC_API_KEY'))</code> and <code>model($env-&gt;required('ANTHROPIC_MODEL'))</code>. The same <code>send()</code> returns a string; streaming uses:</p>
 [[php]]
 <?php
 use PhpOrbit\Ai\Agent;
@@ -125,7 +169,13 @@ $answer = Agent::using(OpenAICompatible::class)
 [[/php]]
 <p><code>OpenAICompatible</code> uses the OpenAI chat/SSE shape and <code>max_tokens</code>. Its default endpoint is the loopback URL above. <code>endpoint()</code> takes the complete request URL, not a base URL. Remote endpoints require HTTPS with peer/host verification; plain HTTP is permitted only for literal loopback hosts. Redirects are disabled, and URLs must not contain credentials, query strings or fragments. Endpoint configuration is operator-controlled: never accept an arbitrary endpoint from user input.</p>
 
-<h2>Errors, limits and test doubles</h2>
+<h2 id="errors">Errors, limits and test doubles</h2>
+<ul>
+<li><strong>Missing extension:</strong> check <code>php -m</code> for <code>curl</code> and enable it in the configuration reported by <code>php --ini</code>.</li>
+<li><strong>Missing key or model:</strong> verify the names in <code>.env</code> match the chosen provider. Real environment variables override the file. Do not print configuration values while diagnosing a failure.</li>
+<li><strong>Provider HTTP error:</strong> check account access, the exact model identifier, quota and billing in the provider's dashboard. No automatic fallback or retry is performed.</li>
+<li><strong>Delayed web output:</strong> return <code>response()</code>, not an echoed <code>send()</code> result, and check the <a href="#http-streaming">buffering and timeout requirements</a>.</li>
+</ul>
 <p>Catch <code>AiFailed</code> for transport, HTTP, provider-response, truncation or event-size failures. Exception messages never contain provider response bodies, keys or prompts. Missing/invalid builder inputs throw <code>InvalidArgumentException</code>. A key is validated without silently falling back to another provider or environment variable. Agent/request/credential debug output is redacted and serialization is refused.</p>
 <p>Default limits: 1 MiB for prompt plus system text, 16 MiB total provider response, 1 MiB per pending transport buffer/SSE event, 1024 output tokens and a 120-second timeout (configurable from 1 to 600 seconds). Each provider request uses a fresh connection. No retries, background jobs or provider calls at boot are added.</p>
 <p><code>Agent::using()</code> accepts a <code>Provider</code> class or instance. The interface supplies the endpoint, request body/headers and text/SSE decoding. <code>withTransport(Transport $transport)</code> supports isolated tests; a transport returns raw byte fragments and must enforce HTTP status, media type, size and timeout rules. Framework providers and builders are stateless/immutable. Custom providers/transports must not retain per-user request data when registered as singletons.</p>

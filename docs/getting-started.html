@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Getting started — phporbit</title>
-<meta name="description" content="Create a project, run it locally, and build your first page with a route, controller and template.">
+<meta name="description" content="Create a project, build your first page, then choose a practical path into APIs, authentication or AI.">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/docs.css">
 </head>
@@ -26,8 +26,10 @@
 <main id="content">
     <article>
         <h1>Getting started</h1>
-        <p class="summary">Create a project, run it locally, and build your first page with a route, controller and template.</p>
+        <p class="summary">Create a project, build your first page, then choose a practical path into APIs, authentication or AI.</p>
         <p>This guide takes you from an empty folder to a page that says <strong>Hello, Ada!</strong>. Start with a blank project and follow the numbered steps in order. You do not need a separate web server or database server.</p>
+
+<p>Already have a running blank application? Jump to <a href="#first-api">your first API</a>, <a href="#first-auth">account registration and MFA</a> or <a href="#first-ai">your first AI answer</a>. These are optional paths, not extra prerequisites for building a page. Authentication needs working SMTP; remote AI needs a provider key and can incur costs.</p>
 
 <h2 id="before-you-start">1. Check your tools</h2>
 
@@ -203,6 +205,33 @@ php orbit migrate</code></pre></figure>
 <p>Browser requests <code>GET /greet/Ada</code> &rarr; router selects <code>GreetController</code> &rarr; controller passes <code>Ada</code> to the template &rarr; template becomes an HTML response &rarr; browser displays the page.</p>
 </div>
 
+<h2 id="choose-your-path">Choose what to build next</h2>
+<p>Continue in the same <code>my-app</code> project. Keep your existing routes and files; you do not need another installation. Each path below links to its maintained reference for configuration, security rules and more examples.</p>
+<ul>
+<li><a href="#first-api">An API</a>: return JSON to another application, with generated routes and Swagger documentation.</li>
+<li><a href="#first-auth">User accounts</a>: add verified registration, login, MFA and administrator management.</li>
+<li><a href="#first-ai">AI text generation</a>: ask OpenAI or Claude a question from a server-side PHP script.</li>
+</ul>
+
+<h3 id="first-api">Build a public test API</h3>
+<p>In your second terminal, run:</p>
+<figure class="code"><figcaption>Shell</figcaption><pre><code>php orbit make:api Ping --public
+php orbit migrate
+php orbit routes</code></pre></figure>
+<p>Restart <code>php orbit serve --debug</code>, then open <code>http://127.0.0.1:8080/api/v1/ping</code>. You should receive <code>{"message":"It works"}</code>. This is separate from the <code>/ping</code> route you added earlier.</p>
+<p>The generator writes <code>app/src/Controllers/Api/V1/PingController.php</code> and <code>app/api/v1/ping.php</code>. The first returns your JSON; the second defines the method, version, access policy and OpenAPI description. Both load automatically: <strong>do not add this API to <code>app/routes.php</code> again</strong>. Open <code>/api/docs</code>, expand the ping operation and use <b>Try it out</b>, then <b>Execute</b>, to call it.</p>
+<p><code>--public</code> is an explicit choice for this harmless test endpoint. Without it, generated APIs require Bearer authentication; a blank project first needs <code>make:auth</code> or your own token services. Never expose private data by removing the guard. See the <a href="api.html#first-endpoint">API walkthrough</a> to change the response, keep its schema accurate and add a protected endpoint.</p>
+
+<h3 id="first-auth">Add verified accounts and MFA</h3>
+<p>For this blank project, run <code>php orbit make:auth</code> once. It generates editable account pages, controllers, routes and migrations without replacing your existing page or API. Do not run it over a demo project, which already has authentication.</p>
+<p>Before registering, configure <code>APP_URL=http://127.0.0.1:8080</code> and SMTP in <code>.env</code>, apply migrations and restart the server. The default <code>MAIL_DRIVER=array</code> does not deliver verification messages. A registration is not a usable account until you confirm its email.</p>
+<p>Follow <a href="advanced-auth.html#new-project">the authentication setup</a> for the SMTP example and the complete sequence: register at <code>/register</code>, confirm the email, sign in at <code>/login</code>, then enable MFA at <code>/account/security</code>. Save recovery codes privately. Administrator access is an explicit operator action, not a privilege given to the first visitor.</p>
+
+<h3 id="first-ai">Ask an AI model from PHP</h3>
+<p>Enable <code>ext-curl</code> and choose a provider: <strong>OpenAI</strong>, <strong>Claude through Anthropic</strong>, or an OpenAI-compatible local service. No provider is contacted during project setup. A paid provider requires your own key and an available model; keep credentials in <code>.env</code> or the real environment, never in browser code.</p>
+<p>Follow <a href="ai.html#first-answer">the runnable AI script</a> to create <code>ask-ai.php</code> in the project root and run <code>php ask-ai.php</code>. It loads the autoloader and typed configuration explicitly, then prints one answer. The same guide shows <a href="ai.html#claude">Claude</a> and <a href="ai.html#http-streaming">live HTTP streaming</a>. There is no global <code>env()</code> helper and no <code>make:ai</code> command.</p>
+<p>Start with a fixed, non-sensitive prompt. Running the script sends it to the selected provider and can incur costs. An AI web endpoint additionally needs authentication, rate limits and a budget policy; do not turn the public ping example into an unrestricted AI proxy.</p>
+
 <h2 id="project-layout">Where things go</h2>
 
 <div class="scroller">
@@ -210,6 +239,7 @@ php orbit migrate</code></pre></figure>
 <thead><tr><th>Path</th><th>What to put there</th></tr></thead>
 <tbody>
 <tr><td><code>app/routes.php</code></td><td>Connections between URLs and handlers</td></tr>
+<tr><td><code>app/api/vN/</code></td><td>Automatically loaded API declarations and OpenAPI descriptions generated by <code>make:api</code></td></tr>
 <tr><td><code>app/src/Controllers/</code></td><td>Your request-handling classes, under <code>App\Controllers</code></td></tr>
 <tr><td><code>app/templates/</code></td><td>HTML templates ending in <code>.orbit.php</code></td></tr>
 <tr><td><code>app/bootstrap.php</code></td><td>Startup configuration: services and middleware (layers around handlers)</td></tr>
@@ -237,6 +267,9 @@ php orbit migrate</code></pre></figure>
 <tr><td>404 or an old version of a page</td><td>Check the exact URL and <code>php orbit routes</code>. Restart after PHP changes; <code>/greet/Ada</code> matches, but <code>/greet</code> does not.</td></tr>
 <tr><td>500 / Internal Server Error</td><td>Use <code>--debug</code> locally, retry the request and read the error and server terminal. Check imports, spelling and semicolons. Do not turn on debug on a public server.</td></tr>
 <tr><td>The generator says a file exists</td><td>Edit that file rather than regenerating it. <code>--force</code> overwrites work; only use it if you intend to replace the file.</td></tr>
+<tr><td>A generated API returns 401</td><td>It is protected by default. Install authentication and supply a valid Bearer token; use <code>--public</code> only when creating an intentionally public endpoint. See <a href="api.html#protected-endpoint">protected APIs</a>.</td></tr>
+<tr><td>No registration email arrives</td><td>Check <code>MAIL_DRIVER=smtp</code>, the SMTP connection and <code>APP_URL</code>. With <code>array</code>, no mail is delivered. See <a href="advanced-auth.html#new-project">authentication setup</a>.</td></tr>
+<tr><td>An AI call fails or appears buffered</td><td>Check <code>ext-curl</code>, key/model access and the server log without sharing secrets. CLI scripts use <code>send()</code>; web handlers return <code>response()</code>. See <a href="ai.html#errors">AI errors</a> and <a href="ai.html#http-streaming">streaming configuration</a>.</td></tr>
 </tbody>
 </table>
 </div>

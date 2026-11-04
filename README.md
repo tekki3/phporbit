@@ -9,6 +9,12 @@ It explains the commands and takes you from installation to a page that greets
 a visitor by name. Open the HTML file in your browser after downloading this
 repository; no documentation server or build step is needed.
 
+Already have a running project? Follow the practical paths for
+[a JSON API](docs/getting-started.html#first-api),
+[verified accounts and MFA](docs/advanced-auth.html#new-project), or
+[a runnable AI script with OpenAI or Claude](docs/ai.html#first-answer).
+Each walkthrough links to its maintained reference for the details.
+
 ## Requirements
 
 - **PHP 8.3 or newer**, with `pdo_sqlite`, `mbstring`, `fileinfo` and `sodium`
